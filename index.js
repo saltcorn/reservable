@@ -42,6 +42,29 @@ const configuration_workflow = () =>
                   options: fields.filter((f) => f.is_fkey).map((f) => f.name),
                 },
               },
+              {
+                name: "start_field",
+                label: "Start date field",
+                type: "String",
+                required: true,
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "Date")
+                    .map((f) => f.name),
+                },
+              },
+              {
+                name: "duration_field",
+                label: "Duration field",
+                sublabel: "Integer field holding duration in minutes",
+                type: "String",
+                required: true,
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "Integer")
+                    .map((f) => f.name),
+                },
+              },
               new FieldRepeat({
                 name: "availability",
                 fields: [
@@ -116,61 +139,27 @@ const get_state_fields = async (table_id, viewname, { show_view }) => {
 const run = async (
   table_id,
   viewname,
-  { show_view, order_field, descending },
-  all_state,
+  {
+    reservable_entity_key,
+    start_field,
+    duration_field,
+    availability,
+    services,
+  },
+  state,
   extraArgs
 ) => {
-  const id = `map${Math.round(Math.random() * 100000)}`;
-  const { _offset, ...state } = all_state;
-  const tbl = await Table.findOne({ id: table_id });
+  const table = await Table.findOne({ id: table_id });
   const fields = await tbl.getFields();
-  const qstate = await stateFieldsToWhere({ fields, state });
-  const nrows = await tbl.countRows(qstate);
-
-  const offset = typeof _offset === "undefined" ? 0 : +_offset;
-  var hasNext = offset < nrows - 1;
-  var hasPrev = offset > 0;
-
-  const showview = await View.findOne({ name: show_view });
-  if (!showview)
-    return div(
-      { class: "alert alert-danger" },
-      "Stepper incorrectly configured. Cannot find view: ",
-      show_view
-    );
-
-  const sresps = await showview.runMany(state, {
-    ...extraArgs,
-    orderBy: order_field,
-    ...(descending && { orderDesc: true }),
-    limit: 1,
-    offset,
-  });
-
-  return div(
-    sresps.length > 0 ? sresps[0].html : "Nothing to see here",
-    div(
-      { class: "d-flex justify-content-between" },
-
-      button(
-        {
-          disabled: !hasPrev,
-          class: "btn btn-secondary",
-          onClick: `set_state_field('_offset',${offset - 1})`,
-        },
-        "&laquo Previous"
-      ),
-      div(`${offset + 1} / ${nrows}`),
-      button(
-        {
-          disabled: !hasNext,
-          class: "btn btn-secondary",
-          onClick: `set_state_field('_offset',${offset + 1})`,
-        },
-        "Next &raquo"
-      )
-    )
-  );
+  const entity_wanted = state[reservable_entity_key];
+  const from = new Date();
+  from.setHours(0, 0, 0, 0);
+  const to = new Date();
+  to.setHours(23, 59, 59, 999);
+  const q = {};
+  q[start_field] = [{ gt: from }, { lt: to }];
+  if (entity_wanted) q[reservable_entity_key] = entity_wanted;
+  const taken_slots = await table.getRows(q);
 };
 
 module.exports = {
