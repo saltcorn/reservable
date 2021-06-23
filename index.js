@@ -56,7 +56,7 @@ const configuration_workflow = () =>
               {
                 name: "duration_field",
                 label: "Duration field",
-                sublabel: "Integer field holding duration in minutes",
+                sublabel: "Integer field holding booked duration in minutes",
                 type: "String",
                 required: true,
                 attributes: {
@@ -106,13 +106,12 @@ const configuration_workflow = () =>
                   {
                     name: "title",
                     label: "Title",
-                    sublabel: "Optional tname of this service",
+                    sublabel: "Optional name of this service",
                     type: "String",
                   },
                   {
                     name: "duration",
                     label: "Duration (minutes)",
-                    sublabel: "Optional name of this service",
                     type: "Integer",
                     attributes: {
                       min: 0,
@@ -135,6 +134,21 @@ const get_state_fields = async (table_id, viewname, { show_view }) => {
     return sf;
   });
 };
+const gcd = function (a, b) {
+  if (!b) {
+    return a;
+  }
+
+  return gcd(b, a % b);
+};
+
+let gcdArr = function (arr) {
+  let gcdres = gcd(arr[0], arr[1]);
+  for (let i = 3; i < arr.length; i++) {
+    gcdres = gcd(gcdres, arr[i]);
+  }
+  return gcdres;
+};
 
 const run = async (
   table_id,
@@ -152,14 +166,50 @@ const run = async (
   const table = await Table.findOne({ id: table_id });
   const fields = await tbl.getFields();
   const entity_wanted = state[reservable_entity_key];
-  const from = new Date();
+  const date = new Date(); //todo from state
+
+  const from = new Date(date);
   from.setHours(0, 0, 0, 0);
-  const to = new Date();
+  const to = new Date(date);
   to.setHours(23, 59, 59, 999);
   const q = {};
   q[start_field] = [{ gt: from }, { lt: to }];
   if (entity_wanted) q[reservable_entity_key] = entity_wanted;
   const taken_slots = await table.getRows(q);
+
+  // figure out regular availability for this day
+  const dayOfWeek = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ][date.getDay()];
+  const relevant_availabilities = availability.filter(
+    ({ day }) =>
+      day === dayOfWeek ||
+      (day === "Mon-Fri" && !["Saturday", "Sunday"].includes(dayOfWeek))
+  );
+
+  const available_slots = [];
+  const durGCD = gcdArr(services.map((s) => s.duration));
+  relevant_availabilities.forEach(({ from, to }) => {
+    for (let i = (from * 60) / durGCD; i < (to * 60) / durGCD; i++) {
+      available_slots[i] = true;
+    }
+  });
+  taken_slots.forEach((slot) => {
+    const from =
+      slot[start_field].getHours() * 60 + slot[start_field].getMinutes();
+    const to = from + slot[duration_field];
+    for (let i = from / durGCD; i < to / durGCD; i++) {
+      available_slots[i] = false;
+    }
+  });
+  const minSlot = Math.min(...Object.keys(available_slots))
+  const maxSlot = Math.max(...Object.keys(available_slots))
 };
 
 module.exports = {
