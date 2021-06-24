@@ -150,6 +150,10 @@ let gcdArr = function (arr) {
   return gcdres;
 };
 
+function range(size, startAt = 0) {
+  return [...Array(size).keys()].map((i) => i + startAt);
+}
+
 const run = async (
   table_id,
   viewname,
@@ -208,8 +212,20 @@ const run = async (
       available_slots[i] = false;
     }
   });
-  const minSlot = Math.min(...Object.keys(available_slots))
-  const maxSlot = Math.max(...Object.keys(available_slots))
+  const minSlot = Math.min(...Object.keys(available_slots));
+  const maxSlot = Math.max(...Object.keys(available_slots));
+  const service_availabilities = services.map((s) => {
+    const nslots = s.duration / durGCD;
+    const availabilities = [];
+    for (let i = minSlot; i < maxSlot; i++) {
+      if (range(nslots, i).every((j) => available_slots[j])) {
+        const mins_since_midnight = i * durGCD;
+        const hour = mins_since_midnight % 60;
+        availabilities.push({ hour, minute: mins_since_midnight - hour * 60 });
+      }
+    }
+    return availabilities;
+  });
 };
 
 module.exports = {
