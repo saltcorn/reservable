@@ -300,24 +300,42 @@ const reserve_btn = ({ viewname, hour, minute, service, serviceIx, req }) =>
       `${hour}:${String(minute).padStart(2, "0")}`
     )
   );
-const getReservationForm = async ({
-  table_id,
-  viewname,
-  config,
-  body,
-  req,
-}) => {
-  const table = await Table.findOne({ id: table_id });
-
-  const { view_to_create } = config;
+const getReservationForm = async ({ table, viewname, config, body, req }) => {
+  const {
+    view_to_create,
+    reservable_entity_key,
+    start_field,
+    duration_field,
+    services,
+  } = config;
   const view = await View.findOne({ name: view_to_create });
   if (!view)
     throw new InvalidConfiguration("View to create reservation does not exist");
   const { columns, layout } = view.configuration;
   const form = await getForm(table, viewname, columns, layout, null, req);
-  form.hidden("hour", "minute", "serviceIx", "step");
-  form.values = { ...body, step: "makeReservation" };
+  form.hidden(start_field, duration_field, "step");
   return form;
+};
+const makeReservation = async ({ table, viewname, config, body, req, res }) => {
+  const form = await getReservationForm({
+    table,
+    viewname,
+    config,
+    body,
+    req,
+  });
+  form.validate(body);
+  const { step, ...row } = form.values;
+  const ins_res = await table.tryInsertRow(
+    row,
+    req.user ? +req.user.id : undefined
+  );
+  const id = ins_res.success;
+  const confirmation_view = await View.findOne({
+    name: config.confirmation_view,
+  });
+  console.log({ ins_res });
+  return await confirmation_view.run_possibly_on_page({ id }, req, res);
 };
 const runPost = async (
   table_id,
@@ -327,17 +345,36 @@ const runPost = async (
   body,
   { res, req }
 ) => {
+  const table = await Table.findOne({ id: table_id });
+
   if (body.step === "getReservationForm") {
     const form = await getReservationForm({
-      table_id,
+      table,
       viewname,
       config,
       body,
       req,
     });
+    const startDate = new Date();
+    startDate.setHours(+body.hour);
+    startDate.setMinutes(+body.minute);
+    form.values = {
+      [config.start_field]: startDate.toISOString(),
+      [config.duration_field]: config.services[+body.serviceIx].duration,
+      step: "makeReservation",
+    };
+
     res.sendWrap(viewname, renderForm(form, req.csrfToken()));
   } else if (body.step === "makeReservation") {
-    res.sendWrap(viewname, "WIP!!!");
+    const something = await makeReservation({
+      table,
+      viewname,
+      config,
+      body,
+      req,
+      res,
+    });
+    res.sendWrap(viewname, something);
   }
 };
 
