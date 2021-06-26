@@ -6,6 +6,7 @@ const {
   domReady,
   style,
   button,
+  h3, ul, li
 } = require("@saltcorn/markup/tags");
 const View = require("@saltcorn/data/models/view");
 const Workflow = require("@saltcorn/data/models/workflow");
@@ -168,7 +169,6 @@ const run = async (
   extraArgs
 ) => {
   const table = await Table.findOne({ id: table_id });
-  const fields = await tbl.getFields();
   const entity_wanted = state[reservable_entity_key];
   const date = new Date(); //todo from state
 
@@ -204,6 +204,7 @@ const run = async (
       available_slots[i] = true;
     }
   });
+  console.log({available_slots, durGCD});
   taken_slots.forEach((slot) => {
     const from =
       slot[start_field].getHours() * 60 + slot[start_field].getMinutes();
@@ -214,18 +215,28 @@ const run = async (
   });
   const minSlot = Math.min(...Object.keys(available_slots));
   const maxSlot = Math.max(...Object.keys(available_slots));
-  const service_availabilities = services.map((s) => {
-    const nslots = s.duration / durGCD;
+  const service_availabilities = services.map((service) => {
+    const nslots = service.duration / durGCD;
     const availabilities = [];
-    for (let i = minSlot; i < maxSlot; i++) {
+    for (let i = minSlot; i <= maxSlot; i++) {
       if (range(nslots, i).every((j) => available_slots[j])) {
         const mins_since_midnight = i * durGCD;
-        const hour = mins_since_midnight % 60;
+        const hour = Math.floor(mins_since_midnight / 60);
+        console.log({i, mins_since_midnight,hour, minute: mins_since_midnight - hour * 60 });
         availabilities.push({ hour, minute: mins_since_midnight - hour * 60 });
       }
     }
-    return availabilities;
+    console.log({ availabilities, service });
+    return { availabilities, service };
   });
+  return div(
+    service_availabilities.map(({ availabilities, service }) =>
+      div(
+        h3(service.title || `${service.duration} minutes`),
+        ul(availabilities.map(({ hour, minute }) => li(`${hour}:${minute}`)))
+      )
+    )
+  );
 };
 
 module.exports = {
