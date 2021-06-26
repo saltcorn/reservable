@@ -6,7 +6,10 @@ const {
   domReady,
   style,
   button,
-  h3, ul, li
+  h3,
+  ul,
+  li,
+  form,
 } = require("@saltcorn/markup/tags");
 const View = require("@saltcorn/data/models/view");
 const Workflow = require("@saltcorn/data/models/workflow");
@@ -16,7 +19,11 @@ const Field = require("@saltcorn/data/models/field");
 const FieldRepeat = require("@saltcorn/data/models/fieldrepeat");
 const db = require("@saltcorn/data/db");
 const { stateFieldsToWhere } = require("@saltcorn/data/plugin-helper");
-
+const { renderForm } = require("@saltcorn/markup");
+const { InvalidConfiguration } = require("@saltcorn/data/utils");
+const {
+  getForm,
+} = require("@saltcorn/data/base-plugin/viewtemplates/viewable_fields");
 const configuration_workflow = () =>
   new Workflow({
     steps: [
@@ -31,7 +38,21 @@ const configuration_workflow = () =>
           // slot duration - fixed or max/min
           // form for reservation
           // availability: regular + blocking table. no table in v1
-
+          const show_views = await View.find_table_views_where(
+            context.table_id,
+            ({ state_fields, viewtemplate, viewrow }) =>
+              viewrow.name !== context.viewname &&
+              state_fields.some((sf) => sf.name === "id")
+          );
+          const create_views = await View.find_table_views_where(
+            context.table_id,
+            ({ state_fields, viewtemplate, viewrow }) =>
+              viewtemplate.name === "Edit" &&
+              viewrow.name !== context.viewname &&
+              state_fields.every((sf) => !sf.required)
+          );
+          const show_view_opts = show_views.map((v) => v.select_option);
+          const create_view_opts = create_views.map((v) => v.select_option);
           return new Form({
             fields: [
               {
@@ -64,6 +85,23 @@ const configuration_workflow = () =>
                   options: fields
                     .filter((f) => f.type.name === "Integer")
                     .map((f) => f.name),
+                },
+              },
+              {
+                name: "view_to_create",
+                label: "Use view to create reservation",
+                type: "String",
+                attributes: {
+                  options: create_view_opts,
+                },
+              },
+              {
+                name: "confirmation_view",
+                label: "Confirmed reservation view",
+                type: "String",
+                required: true,
+                attributes: {
+                  options: show_view_opts,
                 },
               },
               new FieldRepeat({
@@ -166,7 +204,7 @@ const run = async (
     services,
   },
   state,
-  extraArgs
+  { req, res }
 ) => {
   const table = await Table.findOne({ id: table_id });
   const entity_wanted = state[reservable_entity_key];
@@ -204,7 +242,7 @@ const run = async (
       available_slots[i] = true;
     }
   });
-  console.log({available_slots, durGCD});
+  console.log({ available_slots, durGCD });
   taken_slots.forEach((slot) => {
     const from =
       slot[start_field].getHours() * 60 + slot[start_field].getMinutes();
@@ -215,28 +253,92 @@ const run = async (
   });
   const minSlot = Math.min(...Object.keys(available_slots));
   const maxSlot = Math.max(...Object.keys(available_slots));
-  const service_availabilities = services.map((service) => {
+  const service_availabilities = services.map((service, serviceIx) => {
     const nslots = service.duration / durGCD;
     const availabilities = [];
     for (let i = minSlot; i <= maxSlot; i++) {
       if (range(nslots, i).every((j) => available_slots[j])) {
         const mins_since_midnight = i * durGCD;
         const hour = Math.floor(mins_since_midnight / 60);
-        console.log({i, mins_since_midnight,hour, minute: mins_since_midnight - hour * 60 });
+        console.log({
+          i,
+          mins_since_midnight,
+          hour,
+          minute: mins_since_midnight - hour * 60,
+        });
         availabilities.push({ hour, minute: mins_since_midnight - hour * 60 });
       }
     }
     console.log({ availabilities, service });
-    return { availabilities, service };
+    return { availabilities, service, serviceIx };
   });
   return div(
-    service_availabilities.map(({ availabilities, service }) =>
+    service_availabilities.map(({ availabilities, service, serviceIx }) =>
       div(
         h3(service.title || `${service.duration} minutes`),
-        ul(availabilities.map(({ hour, minute }) => li(`${hour}:${minute}`)))
+        ul(
+          availabilities.map(({ hour, minute }) =>
+            reserve_btn({ viewname, hour, minute, service, serviceIx, req })
+          )
+        )
       )
     )
   );
+};
+
+const reserve_btn = ({ viewname, hour, minute, service, serviceIx, req }) =>
+  form(
+    { action: `/view/${viewname}`, method: "post" },
+    input({ type: "hidden", name: "_csrf", value: req.csrfToken() }),
+    input({ type: "hidden", name: "hour", value: hour }),
+    input({ type: "hidden", name: "minute", value: minute }),
+    input({ type: "hidden", name: "serviceIx", value: serviceIx }),
+    input({ type: "hidden", name: "step", value: "getReservationForm" }),
+
+    button(
+      { type: "submit", class: "btn btn-primary mt-2" },
+      `${hour}:${String(minute).padStart(2, "0")}`
+    )
+  );
+const getReservationForm = async ({
+  table_id,
+  viewname,
+  config,
+  body,
+  req,
+}) => {
+  const table = await Table.findOne({ id: table_id });
+
+  const { view_to_create } = config;
+  const view = await View.findOne({ name: view_to_create });
+  if (!view)
+    throw new InvalidConfiguration("View to create reservation does not exist");
+  const { columns, layout } = view.configuration;
+  const form = await getForm(table, viewname, columns, layout, null, req);
+  form.hidden("hour", "minute", "serviceIx", "step");
+  form.values = { ...body, step: "makeReservation" };
+  return form;
+};
+const runPost = async (
+  table_id,
+  viewname,
+  config,
+  state,
+  body,
+  { res, req }
+) => {
+  if (body.step === "getReservationForm") {
+    const form = await getReservationForm({
+      table_id,
+      viewname,
+      config,
+      body,
+      req,
+    });
+    res.sendWrap(viewname, renderForm(form, req.csrfToken()));
+  } else if (body.step === "makeReservation") {
+    res.sendWrap(viewname, "WIP!!!");
+  }
 };
 
 module.exports = {
@@ -248,6 +350,7 @@ module.exports = {
       get_state_fields,
       configuration_workflow,
       run,
+      runPost,
     },
   ],
 };
