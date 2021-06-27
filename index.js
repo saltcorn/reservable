@@ -19,7 +19,7 @@ const Field = require("@saltcorn/data/models/field");
 const FieldRepeat = require("@saltcorn/data/models/fieldrepeat");
 const db = require("@saltcorn/data/db");
 const { stateFieldsToWhere } = require("@saltcorn/data/plugin-helper");
-const { renderForm } = require("@saltcorn/markup");
+const { renderForm, localeHourMinute } = require("@saltcorn/markup");
 const { InvalidConfiguration } = require("@saltcorn/data/utils");
 const {
   getForm,
@@ -242,8 +242,14 @@ const run = async (
       available_slots[i] = true;
     }
   });
-  console.log({ available_slots, durGCD });
+  console.log({ taken_slots });
   taken_slots.forEach((slot) => {
+    console.log(
+      "taken slot",
+      slot,
+      slot[start_field].getHours(),
+      slot[start_field].getTimezoneOffset()
+    );
     const from =
       slot[start_field].getHours() * 60 + slot[start_field].getMinutes();
     const to = from + slot[duration_field];
@@ -260,13 +266,19 @@ const run = async (
       if (range(nslots, i).every((j) => available_slots[j])) {
         const mins_since_midnight = i * durGCD;
         const hour = Math.floor(mins_since_midnight / 60);
-        console.log({
-          i,
-          mins_since_midnight,
+
+        const minute = mins_since_midnight - hour * 60;
+        const date = new Date();
+        date.setHours(hour);
+        date.setMinutes(minute);
+        date.setSeconds(0)
+        date.setMilliseconds(0)
+        
+        availabilities.push({
           hour,
-          minute: mins_since_midnight - hour * 60,
+          minute,
+          date,
         });
-        availabilities.push({ hour, minute: mins_since_midnight - hour * 60 });
       }
     }
     console.log({ availabilities, service });
@@ -277,8 +289,8 @@ const run = async (
       div(
         h3(service.title || `${service.duration} minutes`),
         ul(
-          availabilities.map(({ hour, minute }) =>
-            reserve_btn({ viewname, hour, minute, service, serviceIx, req })
+          availabilities.map(({ hour, minute, date }) =>
+            reserve_btn({ viewname, hour, minute, service, date, serviceIx, req })
           )
         )
       )
@@ -286,7 +298,15 @@ const run = async (
   );
 };
 
-const reserve_btn = ({ viewname, hour, minute, service, serviceIx, req }) =>
+const reserve_btn = ({
+  viewname,
+  hour,
+  minute,
+  date,
+  service,
+  serviceIx,
+  req,
+}) =>
   form(
     { action: `/view/${viewname}`, method: "post" },
     input({ type: "hidden", name: "_csrf", value: req.csrfToken() }),
@@ -297,7 +317,8 @@ const reserve_btn = ({ viewname, hour, minute, service, serviceIx, req }) =>
 
     button(
       { type: "submit", class: "btn btn-primary mt-2" },
-      `${hour}:${String(minute).padStart(2, "0")}`
+      localeHourMinute(date)
+      //  `${hour}:${String(minute).padStart(2, "0")}`
     )
   );
 const getReservationForm = async ({ table, viewname, config, body, req }) => {
@@ -326,6 +347,7 @@ const makeReservation = async ({ table, viewname, config, body, req, res }) => {
   });
   form.validate(body);
   const { step, ...row } = form.values;
+  console.log({row});
   const ins_res = await table.tryInsertRow(
     row,
     req.user ? +req.user.id : undefined
@@ -358,6 +380,7 @@ const runPost = async (
     const startDate = new Date();
     startDate.setHours(+body.hour);
     startDate.setMinutes(+body.minute);
+    console.log({ startDate, body });
     form.values = {
       [config.start_field]: startDate.toISOString(),
       [config.duration_field]: config.services[+body.serviceIx].duration,
@@ -391,3 +414,15 @@ module.exports = {
     },
   ],
 };
+
+/*
+TODO
+
+-tz
+-pick day
+-pick entity
+-check availabilty in make reservation
+-services is table
+-offers_service is table
+
+*/
