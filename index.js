@@ -10,6 +10,7 @@ const {
   ul,
   li,
   form,
+  a,
 } = require("@saltcorn/markup/tags");
 const View = require("@saltcorn/data/models/view");
 const Workflow = require("@saltcorn/data/models/workflow");
@@ -19,7 +20,11 @@ const Field = require("@saltcorn/data/models/field");
 const FieldRepeat = require("@saltcorn/data/models/fieldrepeat");
 const db = require("@saltcorn/data/db");
 const { stateFieldsToWhere } = require("@saltcorn/data/plugin-helper");
-const { renderForm, localeHourMinute } = require("@saltcorn/markup");
+const {
+  renderForm,
+  localeHourMinute,
+  localeDate,
+} = require("@saltcorn/markup");
 const { InvalidConfiguration } = require("@saltcorn/data/utils");
 const {
   getForm,
@@ -208,8 +213,7 @@ const run = async (
 ) => {
   const table = await Table.findOne({ id: table_id });
   const entity_wanted = state[reservable_entity_key];
-  const date = new Date(); //todo from state
-
+  const date = state.day ? new Date(state.day) : new Date(); //todo from state
   const from = new Date(date);
   from.setHours(0, 0, 0, 0);
   const to = new Date(date);
@@ -217,6 +221,7 @@ const run = async (
   const q = {};
   q[start_field] = [{ gt: from }, { lt: to }];
   if (entity_wanted) q[reservable_entity_key] = entity_wanted;
+  console.log({ date, q });
   const taken_slots = await table.getRows(q);
 
   // figure out regular availability for this day
@@ -268,29 +273,48 @@ const run = async (
         const hour = Math.floor(mins_since_midnight / 60);
 
         const minute = mins_since_midnight - hour * 60;
-        const date = new Date();
-        date.setHours(hour);
-        date.setMinutes(minute);
-        date.setSeconds(0)
-        date.setMilliseconds(0)
-        
+        const date1 = new Date(date);
+        date1.setHours(hour);
+        date1.setMinutes(minute);
+        date1.setSeconds(0);
+        date1.setMilliseconds(0);
+
         availabilities.push({
-          hour,
-          minute,
-          date,
+          date: date1,
         });
       }
     }
     console.log({ availabilities, service });
     return { availabilities, service, serviceIx };
   });
+  const nextDay = new Date(date);
+  nextDay.setDate(nextDay.getDate() + 1);
   return div(
+    a(
+      {
+        href: "#",
+        onclick: `set_state_field('day','${nextDay.toISOString().split("T")[0]}')`,
+      },
+      localeDate(nextDay, {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
+      "&rarr;"
+    ),
     service_availabilities.map(({ availabilities, service, serviceIx }) =>
       div(
         h3(service.title || `${service.duration} minutes`),
         ul(
-          availabilities.map(({ hour, minute, date }) =>
-            reserve_btn({ viewname, hour, minute, service, date, serviceIx, req })
+          availabilities.map(({ date }) =>
+            reserve_btn({
+              viewname,
+              service,
+              date,
+              serviceIx,
+              req,
+            })
           )
         )
       )
@@ -298,20 +322,11 @@ const run = async (
   );
 };
 
-const reserve_btn = ({
-  viewname,
-  hour,
-  minute,
-  date,
-  service,
-  serviceIx,
-  req,
-}) =>
+const reserve_btn = ({ viewname, date, service, serviceIx, req }) =>
   form(
     { action: `/view/${viewname}`, method: "post" },
     input({ type: "hidden", name: "_csrf", value: req.csrfToken() }),
-    input({ type: "hidden", name: "hour", value: hour }),
-    input({ type: "hidden", name: "minute", value: minute }),
+    input({ type: "hidden", name: "date", value: date.toISOString() }),
     input({ type: "hidden", name: "serviceIx", value: serviceIx }),
     input({ type: "hidden", name: "step", value: "getReservationForm" }),
 
@@ -347,7 +362,7 @@ const makeReservation = async ({ table, viewname, config, body, req, res }) => {
   });
   form.validate(body);
   const { step, ...row } = form.values;
-  console.log({row});
+  console.log({ row });
   const ins_res = await table.tryInsertRow(
     row,
     req.user ? +req.user.id : undefined
@@ -377,9 +392,7 @@ const runPost = async (
       body,
       req,
     });
-    const startDate = new Date();
-    startDate.setHours(+body.hour);
-    startDate.setMinutes(+body.minute);
+    const startDate = new Date(body.date);
     console.log({ startDate, body });
     form.values = {
       [config.start_field]: startDate.toISOString(),
@@ -418,7 +431,6 @@ module.exports = {
 /*
 TODO
 
--tz
 -pick day
 -pick entity
 -check availabilty in make reservation
