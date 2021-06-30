@@ -11,6 +11,7 @@ const {
   li,
   form,
   a,
+  b,
 } = require("@saltcorn/markup/tags");
 const View = require("@saltcorn/data/models/view");
 const Workflow = require("@saltcorn/data/models/workflow");
@@ -221,7 +222,7 @@ const run = async (
   const q = {};
   q[start_field] = [{ gt: from }, { lt: to }];
   if (entity_wanted) q[reservable_entity_key] = entity_wanted;
-  console.log({ date, q });
+  //console.log({ date, q });
   const taken_slots = await table.getRows(q);
 
   // figure out regular availability for this day
@@ -247,14 +248,14 @@ const run = async (
       available_slots[i] = true;
     }
   });
-  console.log({ taken_slots });
+  //console.log({ taken_slots });
   taken_slots.forEach((slot) => {
-    console.log(
+    /*    console.log(
       "taken slot",
       slot,
       slot[start_field].getHours(),
       slot[start_field].getTimezoneOffset()
-    );
+    ); */
     const from =
       slot[start_field].getHours() * 60 + slot[start_field].getMinutes();
     const to = from + slot[duration_field];
@@ -278,30 +279,70 @@ const run = async (
         date1.setMinutes(minute);
         date1.setSeconds(0);
         date1.setMilliseconds(0);
-
-        availabilities.push({
-          date: date1,
-        });
+        if (date1 > new Date())
+          availabilities.push({
+            date: date1,
+          });
       }
     }
-    console.log({ availabilities, service });
+    //console.log({ availabilities, service });
     return { availabilities, service, serviceIx };
   });
   const nextDay = new Date(date);
   nextDay.setDate(nextDay.getDate() + 1);
-  return div(
-    a(
+
+  let prevDayLink = div();
+  console.log({
+    from,
+    now: new Date(),
+    from_larger_than_now: from > new Date(),
+  });
+  if (from > new Date()) {
+    const prevDay = new Date(date);
+    prevDay.setDate(prevDay.getDate() - 1);
+    prevDayLink = a(
       {
         href: "#",
-        onclick: `set_state_field('day','${nextDay.toISOString().split("T")[0]}')`,
+        onclick: `set_state_field('day','${
+          prevDay.toISOString().split("T")[0]
+        }')`,
       },
-      localeDate(nextDay, {
+      "&larr;",
+      localeDate(prevDay, {
         weekday: "long",
         year: "numeric",
         month: "long",
         day: "numeric",
-      }),
-      "&rarr;"
+      })
+    );
+  }
+  return div(
+    div(
+      { class: "d-flex justify-content-between " },
+      prevDayLink,
+      b(
+        localeDate(date, {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+      ),
+      a(
+        {
+          href: "#",
+          onclick: `set_state_field('day','${
+            nextDay.toISOString().split("T")[0]
+          }')`,
+        },
+        localeDate(nextDay, {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }),
+        "&rarr;"
+      )
     ),
     service_availabilities.map(({ availabilities, service, serviceIx }) =>
       div(
