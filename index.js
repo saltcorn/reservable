@@ -199,22 +199,16 @@ function range(size, startAt = 0) {
   return [...Array(size).keys()].map((i) => i + startAt);
 }
 
-const run = async (
-  table_id,
-  viewname,
-  {
-    reservable_entity_key,
-    start_field,
-    duration_field,
-    availability,
-    services,
-  },
-  state,
-  { req, res }
-) => {
-  const table = await Table.findOne({ id: table_id });
-  const entity_wanted = state[reservable_entity_key];
-  const date = state.day ? new Date(state.day) : new Date(); //todo from state
+const get_available_slots = async ({
+  table,
+  availability,
+  date,
+  entity_wanted,
+  reservable_entity_key,
+  services,
+  start_field,
+  duration_field,
+}) => {
   const from = new Date(date);
   from.setHours(0, 0, 0, 0);
   const to = new Date(date);
@@ -263,6 +257,35 @@ const run = async (
       available_slots[i] = false;
     }
   });
+  return { available_slots, from, durGCD };
+};
+
+const run = async (
+  table_id,
+  viewname,
+  {
+    reservable_entity_key,
+    start_field,
+    duration_field,
+    availability,
+    services,
+  },
+  state,
+  { req, res }
+) => {
+  const table = await Table.findOne({ id: table_id });
+  const entity_wanted = state[reservable_entity_key];
+  const date = state.day ? new Date(state.day) : new Date(); //todo from state
+  const { available_slots, from, durGCD } = await get_available_slots({
+    table,
+    availability,
+    date,
+    entity_wanted,
+    reservable_entity_key,
+    services,
+    start_field,
+    duration_field,
+  });
   const minSlot = Math.min(...Object.keys(available_slots));
   const maxSlot = Math.max(...Object.keys(available_slots));
   const service_availabilities = services.map((service, serviceIx) => {
@@ -292,11 +315,7 @@ const run = async (
   nextDay.setDate(nextDay.getDate() + 1);
 
   let prevDayLink = div();
-  console.log({
-    from,
-    now: new Date(),
-    from_larger_than_now: from > new Date(),
-  });
+
   if (from > new Date()) {
     const prevDay = new Date(date);
     prevDay.setDate(prevDay.getDate() - 1);
@@ -403,17 +422,37 @@ const makeReservation = async ({ table, viewname, config, body, req, res }) => {
   });
   form.validate(body);
   const { step, ...row } = form.values;
-  console.log({ row });
-  const ins_res = await table.tryInsertRow(
-    row,
-    req.user ? +req.user.id : undefined
-  );
-  const id = ins_res.success;
-  const confirmation_view = await View.findOne({
-    name: config.confirmation_view,
+  const date = new Date(row[config.start_field]);
+  // get reservations
+
+  const { available_slots, from, durGCD } = await get_available_slots({
+    ...config,
+    table,
+    date,
+    entity_wanted: null, //reservable entity goes here
   });
-  console.log({ ins_res });
-  return await confirmation_view.run_possibly_on_page({ id }, req, res);
+  const nslots = +row[config.duration_field] / durGCD;
+  const start_slot = (date.getHours() * 60 + date.getMinutes()) / durGCD;
+  const is_available = range(nslots, start_slot).every(
+    (j) => available_slots[j]
+  );
+  if (is_available) {
+    const ins_res = await table.tryInsertRow(
+      row,
+      req.user ? +req.user.id : undefined
+    );
+    const id = ins_res.success;
+    const confirmation_view = await View.findOne({
+      name: config.confirmation_view,
+    });
+    res.sendWrap(
+      viewname,
+      await confirmation_view.run_possibly_on_page({ id }, req, res)
+    );
+  } else {
+    req.flash("error", "No longer available");
+    res.redirect(`/view/${viewname}`);
+  }
 };
 const runPost = async (
   table_id,
@@ -443,7 +482,7 @@ const runPost = async (
 
     res.sendWrap(viewname, renderForm(form, req.csrfToken()));
   } else if (body.step === "makeReservation") {
-    const something = await makeReservation({
+    return await makeReservation({
       table,
       viewname,
       config,
@@ -451,7 +490,6 @@ const runPost = async (
       req,
       res,
     });
-    res.sendWrap(viewname, something);
   }
 };
 
@@ -472,9 +510,8 @@ module.exports = {
 /*
 TODO
 
--pick day
 -pick entity
--check availabilty in make reservation
+-pick service
 -services is table
 -offers_service is table
 
