@@ -21,11 +21,7 @@ const Field = require("@saltcorn/data/models/field");
 const FieldRepeat = require("@saltcorn/data/models/fieldrepeat");
 const db = require("@saltcorn/data/db");
 const { stateFieldsToWhere } = require("@saltcorn/data/plugin-helper");
-const {
-  renderForm,
-  localeHourMinute,
-  localeDate,
-} = require("@saltcorn/markup");
+const { renderForm, localeTime, localeDate } = require("@saltcorn/markup");
 const { InvalidConfiguration } = require("@saltcorn/data/utils");
 const {
   getForm,
@@ -392,7 +388,7 @@ const reserve_btn = ({ viewname, date, service, serviceIx, req }) =>
 
     button(
       { type: "submit", class: "btn btn-primary mt-2" },
-      localeHourMinute(date)
+      localeTime(date)
       //  `${hour}:${String(minute).padStart(2, "0")}`
     )
   );
