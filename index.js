@@ -370,6 +370,8 @@ const run = async (
               date,
               serviceIx,
               req,
+              entity_wanted,
+              reservable_entity_key,
             })
           )
         )
@@ -378,12 +380,26 @@ const run = async (
   );
 };
 
-const reserve_btn = ({ viewname, date, service, serviceIx, req }) =>
+const reserve_btn = ({
+  viewname,
+  date,
+  service,
+  serviceIx,
+  req,
+  reservable_entity_key,
+  entity_wanted,
+}) =>
   form(
     { action: `/view/${viewname}`, method: "post" },
     input({ type: "hidden", name: "_csrf", value: req.csrfToken() }),
     input({ type: "hidden", name: "date", value: date.toISOString() }),
     input({ type: "hidden", name: "serviceIx", value: serviceIx }),
+    entity_wanted &&
+      input({
+        type: "hidden",
+        name: reservable_entity_key,
+        value: entity_wanted,
+      }),
     input({ type: "hidden", name: "step", value: "getReservationForm" }),
 
     button(
@@ -405,7 +421,7 @@ const getReservationForm = async ({ table, viewname, config, body, req }) => {
     throw new InvalidConfiguration("View to create reservation does not exist");
   const { columns, layout } = view.configuration;
   const form = await getForm(table, viewname, columns, layout, null, req);
-  form.hidden(start_field, duration_field, "step");
+  form.hidden(start_field, duration_field, reservable_entity_key, "step");
   return form;
 };
 const makeReservation = async ({ table, viewname, config, body, req, res }) => {
@@ -473,6 +489,7 @@ const runPost = async (
     form.values = {
       [config.start_field]: startDate.toISOString(),
       [config.duration_field]: config.services[+body.serviceIx].duration,
+      [config.reservable_entity_key]: +body[config.reservable_entity_key],
       step: "makeReservation",
     };
 
