@@ -61,7 +61,6 @@ const configuration_workflow = () =>
                 name: "reservable_entity_key",
                 label: "Key to reservable entity",
                 type: "String",
-                required: true,
                 attributes: {
                   options: fields.filter((f) => f.is_fkey).map((f) => f.name),
                 },
@@ -211,7 +210,8 @@ const get_available_slots = async ({
   to.setHours(23, 59, 59, 999);
   const q = {};
   q[start_field] = [{ gt: from }, { lt: to }];
-  if (entity_wanted) q[reservable_entity_key] = entity_wanted;
+  if (reservable_entity_key && entity_wanted)
+    q[reservable_entity_key] = entity_wanted;
   //console.log({ date, q });
   const taken_slots = await table.getRows(q);
 
@@ -270,7 +270,14 @@ const run = async (
   { req, res }
 ) => {
   const table = await Table.findOne({ id: table_id });
-  const entity_wanted = state[reservable_entity_key];
+  const entity_wanted = reservable_entity_key && state[reservable_entity_key];
+  if (reservable_entity_key) {
+    const fields = await table.getFields();
+    const re_field = fields.find((f) => f.name === reservable_entity_key);
+    if (re_field.required && !entity_wanted)
+      return `Choose a ${reservable_entity_key}`;
+  }
+
   const date = state.day ? new Date(state.day) : new Date(); //todo from state
   const { available_slots, from, durGCD } = await get_available_slots({
     table,
@@ -441,7 +448,7 @@ const makeReservation = async ({ table, viewname, config, body, req, res }) => {
     ...config,
     table,
     date,
-    entity_wanted: null, //reservable entity goes here
+    entity_wanted: row[config.reservable_entity_key],
   });
   const nslots = +row[config.duration_field] / durGCD;
   const start_slot = (date.getHours() * 60 + date.getMinutes()) / durGCD;
@@ -523,7 +530,7 @@ module.exports = {
 /*
 TODO
 
--pick entity
+-if entity is not required, fix availabilities 
 -pick service
 -services is table
 -offers_service is table
