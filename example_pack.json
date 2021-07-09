@@ -444,9 +444,9 @@
   ],
   "plugins": [
     {
-      "name": "@saltcorn/reservable",
-      "source": "local",
-      "location": "/Users/tomn/reservable",
+      "name": "reservable",
+      "source": "npm",
+      "location": "@saltcorn/reservable",
       "configuration": null,
       "deploy_private_key": null
     }
