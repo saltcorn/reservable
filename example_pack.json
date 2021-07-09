@@ -1,0 +1,495 @@
+{
+  "tables": [
+    {
+      "name": "hairdressers",
+      "min_role_read": 1,
+      "min_role_write": 1,
+      "versioned": false,
+      "fields": [
+        {
+          "name": "id",
+          "label": "ID",
+          "is_unique": true,
+          "calculated": false,
+          "stored": false,
+          "expression": null,
+          "type": "Integer",
+          "attributes": {},
+          "required": true,
+          "primary_key": true,
+          "description": ""
+        },
+        {
+          "name": "name",
+          "label": "name",
+          "is_unique": false,
+          "calculated": false,
+          "stored": false,
+          "expression": null,
+          "type": "String",
+          "attributes": {
+            "regexp": "",
+            "options": "",
+            "max_length": null,
+            "min_length": null,
+            "re_invalid_error": ""
+          },
+          "required": false,
+          "primary_key": false,
+          "description": ""
+        }
+      ],
+      "triggers": [],
+      "constraints": [],
+      "ownership_field_name": null
+    },
+    {
+      "name": "reservations",
+      "min_role_read": 1,
+      "min_role_write": 1,
+      "versioned": false,
+      "fields": [
+        {
+          "name": "date",
+          "label": "date",
+          "is_unique": false,
+          "calculated": false,
+          "stored": false,
+          "expression": null,
+          "type": "Date",
+          "attributes": {},
+          "required": false,
+          "primary_key": false,
+          "description": ""
+        },
+        {
+          "name": "duration",
+          "label": "duration",
+          "is_unique": false,
+          "calculated": false,
+          "stored": false,
+          "expression": null,
+          "type": "Integer",
+          "attributes": { "max": null, "min": null },
+          "required": false,
+          "primary_key": false,
+          "description": ""
+        },
+        {
+          "name": "hairdresser",
+          "label": "hairdresser",
+          "is_unique": false,
+          "calculated": false,
+          "stored": false,
+          "expression": null,
+          "type": "Key",
+          "reftable_name": "hairdressers",
+          "attributes": { "summary_field": "name" },
+          "required": true,
+          "primary_key": false,
+          "reftype": "Integer",
+          "refname": "id",
+          "description": ""
+        },
+        {
+          "name": "id",
+          "label": "ID",
+          "is_unique": true,
+          "calculated": false,
+          "stored": false,
+          "expression": null,
+          "type": "Integer",
+          "attributes": {},
+          "required": true,
+          "primary_key": true,
+          "description": ""
+        },
+        {
+          "name": "name",
+          "label": "name",
+          "is_unique": false,
+          "calculated": false,
+          "stored": false,
+          "expression": null,
+          "type": "String",
+          "attributes": {
+            "regexp": "",
+            "options": "",
+            "max_length": null,
+            "min_length": null,
+            "re_invalid_error": ""
+          },
+          "required": false,
+          "primary_key": false,
+          "description": ""
+        }
+      ],
+      "triggers": [],
+      "constraints": [],
+      "ownership_field_name": null
+    }
+  ],
+  "views": [
+    {
+      "name": "editreservation",
+      "viewtemplate": "Edit",
+      "configuration": {
+        "fixed": {
+          "date": null,
+          "duration": null,
+          "hairdresser": null,
+          "preset_date": ""
+        },
+        "layout": {
+          "above": [
+            {
+              "widths": [2, 10],
+              "besides": [
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "blank",
+                      "block": false,
+                      "contents": "name",
+                      "labelFor": "name",
+                      "isFormula": {},
+                      "textStyle": ""
+                    }
+                  ]
+                },
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "field",
+                      "fieldview": "edit",
+                      "textStyle": "",
+                      "field_name": "name",
+                      "configuration": {}
+                    }
+                  ]
+                }
+              ],
+              "breakpoints": ["", ""]
+            },
+            { "type": "line_break" },
+            {
+              "type": "action",
+              "block": false,
+              "rndid": "a95628",
+              "minRole": 10,
+              "isFormula": {},
+              "action_icon": "",
+              "action_name": "Save",
+              "action_size": "",
+              "action_label": "Reserve now",
+              "action_style": "btn-primary",
+              "configuration": {}
+            }
+          ]
+        },
+        "columns": [
+          {
+            "type": "Field",
+            "fieldview": "edit",
+            "textStyle": "",
+            "field_name": "name",
+            "configuration": {}
+          },
+          {
+            "type": "Action",
+            "rndid": "a95628",
+            "minRole": 10,
+            "isFormula": {},
+            "action_icon": "",
+            "action_name": "Save",
+            "action_size": "",
+            "action_label": "Reserve now",
+            "action_style": "btn-primary",
+            "configuration": {}
+          }
+        ],
+        "viewname": "editreservation",
+        "exttable_name": null,
+        "view_when_done": "reserve"
+      },
+      "min_role": 1,
+      "table": "reservations",
+      "default_render_page": ""
+    },
+    {
+      "name": "PickHairdresser",
+      "viewtemplate": "Filter",
+      "configuration": {
+        "layout": {
+          "type": "dropdown_filter",
+          "block": false,
+          "field_name": "hairdresser",
+          "full_width": false,
+          "neutral_label": ""
+        },
+        "columns": [
+          {
+            "type": "DropDownFilter",
+            "block": false,
+            "field_name": "hairdresser",
+            "full_width": false,
+            "neutral_label": ""
+          }
+        ],
+        "viewname": "PickHairdresser",
+        "exttable_name": null
+      },
+      "min_role": 4,
+      "table": "reservations",
+      "default_render_page": ""
+    },
+    {
+      "name": "reserve",
+      "viewtemplate": "Reserve",
+      "configuration": {
+        "services": [{ "title": "haircut", "duration": "30" }],
+        "viewname": "reserve",
+        "start_field": "date",
+        "availability": [
+          { "to": "17", "day": "Mon-Fri", "from": "9" },
+          { "to": "16", "day": "Saturday", "from": "10" },
+          { "to": "18", "day": "Sunday", "from": "12" }
+        ],
+        "exttable_name": null,
+        "duration_field": "duration",
+        "view_to_create": "editreservation",
+        "confirmation_view": "showreserve",
+        "reservable_entity_key": "hairdresser"
+      },
+      "min_role": 1,
+      "table": "reservations",
+      "menu_label": "reserve",
+      "default_render_page": "reserve_page"
+    },
+    {
+      "name": "showreserve",
+      "viewtemplate": "Show",
+      "configuration": {
+        "layout": {
+          "above": [
+            {
+              "widths": [2, 10],
+              "besides": [
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "blank",
+                      "block": false,
+                      "contents": "date",
+                      "labelFor": "",
+                      "isFormula": {},
+                      "textStyle": ""
+                    }
+                  ]
+                },
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "field",
+                      "fieldview": "show",
+                      "textStyle": "",
+                      "field_name": "date",
+                      "configuration": {}
+                    }
+                  ]
+                }
+              ],
+              "breakpoints": ["", ""]
+            },
+            { "type": "line_break" },
+            {
+              "widths": [2, 10],
+              "besides": [
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "blank",
+                      "block": false,
+                      "contents": "duration",
+                      "labelFor": "",
+                      "isFormula": {},
+                      "textStyle": ""
+                    }
+                  ]
+                },
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "field",
+                      "fieldview": "show",
+                      "textStyle": "",
+                      "field_name": "duration",
+                      "configuration": {}
+                    }
+                  ]
+                }
+              ],
+              "breakpoints": ["", ""]
+            },
+            { "type": "line_break" },
+            {
+              "widths": [2, 10],
+              "besides": [
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "blank",
+                      "block": false,
+                      "contents": "hairdresser",
+                      "labelFor": "",
+                      "isFormula": {},
+                      "textStyle": ""
+                    }
+                  ]
+                },
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "join_field",
+                      "block": false,
+                      "textStyle": "",
+                      "join_field": "hairdresser.name"
+                    }
+                  ]
+                }
+              ],
+              "breakpoints": ["", ""]
+            },
+            { "type": "line_break" },
+            {
+              "widths": [2, 10],
+              "besides": [
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "blank",
+                      "block": false,
+                      "contents": "name",
+                      "labelFor": "",
+                      "isFormula": {},
+                      "textStyle": ""
+                    }
+                  ]
+                },
+                {
+                  "above": [
+                    null,
+                    {
+                      "type": "field",
+                      "fieldview": "as_text",
+                      "textStyle": "",
+                      "field_name": "name",
+                      "configuration": {}
+                    }
+                  ]
+                }
+              ],
+              "breakpoints": ["", ""]
+            },
+            { "type": "line_break" }
+          ]
+        },
+        "columns": [
+          {
+            "type": "Field",
+            "fieldview": "show",
+            "textStyle": "",
+            "field_name": "date",
+            "configuration": {}
+          },
+          {
+            "type": "Field",
+            "fieldview": "show",
+            "textStyle": "",
+            "field_name": "duration",
+            "configuration": {}
+          },
+          {
+            "type": "JoinField",
+            "block": false,
+            "textStyle": "",
+            "join_field": "hairdresser.name"
+          },
+          {
+            "type": "Field",
+            "fieldview": "as_text",
+            "textStyle": "",
+            "field_name": "name",
+            "configuration": {}
+          }
+        ],
+        "viewname": "showreserve",
+        "page_title": "",
+        "exttable_name": null,
+        "page_title_formula": false
+      },
+      "min_role": 1,
+      "table": "reservations",
+      "default_render_page": ""
+    }
+  ],
+  "plugins": [
+    {
+      "name": "@saltcorn/reservable",
+      "source": "local",
+      "location": "/Users/tomn/reservable",
+      "configuration": null,
+      "deploy_private_key": null
+    }
+  ],
+  "pages": [
+    {
+      "name": "reserve_page",
+      "title": "reserve",
+      "description": "",
+      "min_role": 4,
+      "layout": {
+        "above": [
+          {
+            "widths": [6, 6],
+            "besides": [
+              {
+                "icon": "",
+                "type": "blank",
+                "block": false,
+                "contents": "Hairdresser",
+                "labelFor": "",
+                "isFormula": {},
+                "textStyle": ""
+              },
+              {
+                "name": "2f424c",
+                "type": "view",
+                "view": "PickHairdresser",
+                "state": "shared"
+              }
+            ],
+            "breakpoints": ["sm", "sm"]
+          },
+          {
+            "name": "3d986d",
+            "type": "view",
+            "view": "reserve",
+            "state": "shared"
+          }
+        ]
+      },
+      "fixed_states": {},
+      "root_page_for_roles": []
+    }
+  ]
+}
