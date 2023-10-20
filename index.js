@@ -428,7 +428,9 @@ const getReservationForm = async ({ table, viewname, config, body, req }) => {
     throw new InvalidConfiguration("View to create reservation does not exist");
   const { columns, layout } = view.configuration;
   const form = await getForm(table, viewname, columns, layout, null, req);
-  form.hidden(start_field, duration_field, reservable_entity_key, "step");
+  form.hidden(start_field, duration_field, "step");
+  if (reservable_entity_key) form.hidden(reservable_entity_key);
+
   return form;
 };
 const makeReservation = async ({ table, viewname, config, body, req, res }) => {
