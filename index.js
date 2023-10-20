@@ -494,7 +494,6 @@ const runPost = async (
       req,
     });
     const startDate = new Date(body.date);
-    console.log({ startDate, body });
     form.values = {
       [config.start_field]: startDate.toISOString(),
       [config.duration_field]: config.services[+body.serviceIx].duration,
