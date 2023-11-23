@@ -52,17 +52,64 @@ const configuration_workflow = (req) =>
         name: req.__("Views"),
         form: async (context) => {
           const table = Table.findOne(context.table_id);
-          const show_views = await View.find_table_views_where(
-            context.table_id,
-            ({ state_fields, viewtemplate, viewrow }) =>
-              viewtemplate.runMany &&
-              viewrow.name !== context.viewname &&
-              state_fields.some((sf) => sf.name === "id")
-          );
-          const show_view_opts = show_views.map((v) => v.select_option);
+          const fields = table.fields;
 
+          const reservable_entity_fields = fields.filter((f) => f.is_fkey);
+          const show_view_opts = {};
+          for (const rfield of reservable_entity_fields) {
+            const retable = Table.findOne(rfield.reftable_name);
+            const show_views = await View.find_table_views_where(
+              retable.id,
+              ({ state_fields, viewtemplate, viewrow }) =>
+                viewtemplate.runMany &&
+                viewrow.name !== context.viewname &&
+                state_fields.some((sf) => sf.name === "id")
+            );
+            show_view_opts[rfield.name] = show_views.map((v) => v.name);
+          }
           return new Form({
             fields: [
+              {
+                name: "reservable_entity_key",
+                label: "Key to reservable entity",
+                type: "String",
+                required: true,
+                attributes: {
+                  options: reservable_entity_fields.map((f) => f.name),
+                },
+              },
+              {
+                name: "start_field",
+                label: "Start date field",
+                type: "String",
+                required: true,
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "Date")
+                    .map((f) => f.name),
+                },
+              },
+              {
+                name: "end_field",
+                label: "End date field",
+                type: "String",
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "Date")
+                    .map((f) => f.name),
+                },
+              },
+              {
+                name: "duration_field",
+                label: "Duration field",
+                sublabel: "Integer field holding booked duration in minutes",
+                type: "String",
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "Integer")
+                    .map((f) => f.name),
+                },
+              },
               {
                 name: "show_view",
                 label: req.__("Single item view"),
@@ -79,7 +126,7 @@ const configuration_workflow = (req) =>
                   ),
                 required: true,
                 attributes: {
-                  options: show_view_opts,
+                  calcOptions: ["reservable_entity_key", show_view_opts],
                 },
               },
             ],
@@ -92,22 +139,30 @@ const configuration_workflow = (req) =>
 const run = async (
   table_id,
   viewname,
-  { show_view },
+  { reservable_entity_key, start_field, end_field, duration_field, show_view },
   state,
-  extraArgs,
-  { countRowsQuery }
+  extraArgs
 ) => {
-  const table = Table.findOne({ id: table_id });
-  const fields = table.getFields();
-  const state1 = { ...state };
-  readState(state1, fields);
+  const restable = Table.findOne({ id: table_id });
+  const resfields = restable.getFields();
+
+  const refield = restable.getField(reservable_entity_key);
+  const retable = Table.findOne(refield.reftable_name);
+
+  const state_re = { ...state };
+  const state_res = { ...state };
+
+  readState(state_re, retable.fields);
 
   const sview = await View.findOne({ name: show_view });
   if (!sview)
     throw new InvalidConfiguration(
       `View ${viewname} incorrectly configured: cannot find view ${show_view}`
     );
-  const q = await stateFieldsToQuery({ state, fields });
+  const q = await stateFieldsToQuery({
+    state: state_re,
+    fields: retable.fields,
+  });
   let qextra = {};
 
   const sresp = await sview.runMany(state, {
@@ -119,7 +174,7 @@ const run = async (
 };
 
 module.exports = {
-  name: "AvailableResourcesFeed",
+  name: "Available Resources Feed",
   display_state_form: false,
   get_state_fields,
   configuration_workflow,
