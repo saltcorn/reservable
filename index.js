@@ -167,7 +167,8 @@ const configuration_workflow = () =>
   });
 
 const get_state_fields = async (table_id, viewname, { show_view }) => {
-  const table_fields = await Field.find({ table_id });
+  const table = Table.findOne(table_id);
+  const table_fields = table.fields;
   return table_fields.map((f) => {
     const sf = new Field(f);
     sf.required = false;
@@ -525,6 +526,7 @@ module.exports = {
       run,
       runPost,
     },
+    require("./available-feed"),
   ],
 };
 
