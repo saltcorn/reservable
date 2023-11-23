@@ -149,28 +149,32 @@ const run = async (
   const refield = restable.getField(reservable_entity_key);
   const retable = Table.findOne(refield.reftable_name);
 
-  const state_re = { ...state };
   const state_res = { ...state };
 
-  readState(state_re, retable.fields);
+  readState(state_res, restable.fields);
+
+  //get reservations
+  const reswhere = await stateFieldsToWhere({
+    fields: resfields,
+    state: state_res,
+    table: restable,
+  });
+
+  const ress = await restable.getRows(reswhere);
+  const resEnts = new Set(ress.map((r) => r[reservable_entity_key]));
 
   const sview = await View.findOne({ name: show_view });
   if (!sview)
     throw new InvalidConfiguration(
       `View ${viewname} incorrectly configured: cannot find view ${show_view}`
     );
-  const q = await stateFieldsToQuery({
-    state: state_re,
-    fields: retable.fields,
-  });
-  let qextra = {};
-
-  const sresp = await sview.runMany(state, {
-    ...extraArgs,
-    ...qextra,
-  });
+  const srespAll = await sview.runMany(state, extraArgs);
+  const srespsAvailable = [];
+  for (const sresp of srespAll) {
+    if (!resEnts.has(sresp.row[retable.pk_name])) srespsAvailable.push(sresp);
+  }
   const showRow = (r) => r.html;
-  return div(sresp.map(showRow));
+  return div(srespsAvailable.map(showRow));
 };
 
 module.exports = {
