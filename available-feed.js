@@ -79,34 +79,13 @@ const configuration_workflow = (req) =>
                 },
               },
               {
-                name: "start_field",
-                label: "Start date field",
-                type: "String",
-                required: true,
-                attributes: {
-                  options: fields
-                    .filter((f) => f.type.name === "Date")
-                    .map((f) => f.name),
-                },
-              },
-              {
-                name: "end_field",
-                label: "End date field",
+                name: "valid_field",
+                label: "Valid reservation field",
+                sublabel: "Only consider reservations with this field valid",
                 type: "String",
                 attributes: {
                   options: fields
-                    .filter((f) => f.type.name === "Date")
-                    .map((f) => f.name),
-                },
-              },
-              {
-                name: "duration_field",
-                label: "Duration field",
-                sublabel: "Integer field holding booked duration in minutes",
-                type: "String",
-                attributes: {
-                  options: fields
-                    .filter((f) => f.type.name === "Integer")
+                    .filter((f) => f.type.name === "Bool")
                     .map((f) => f.name),
                 },
               },
@@ -139,7 +118,7 @@ const configuration_workflow = (req) =>
 const run = async (
   table_id,
   viewname,
-  { reservable_entity_key, start_field, end_field, duration_field, show_view },
+  { reservable_entity_key, valid_field, show_view },
   state,
   extraArgs
 ) => {
@@ -160,6 +139,7 @@ const run = async (
     table: restable,
   });
 
+  if (valid_field) reswhere[valid_field] = true;
   const ress = await restable.getRows(reswhere);
   const resEnts = new Set(ress.map((r) => r[reservable_entity_key]));
 
