@@ -56,6 +56,8 @@ const configuration_workflow = (req) =>
 
           const reservable_entity_fields = fields.filter((f) => f.is_fkey);
           const show_view_opts = {};
+          const slots_available_field = {};
+          const distinct_slot_fields = new Set();
           for (const rfield of reservable_entity_fields) {
             const retable = Table.findOne(rfield.reftable_name);
             const show_views = await View.find_table_views_where(
@@ -66,6 +68,13 @@ const configuration_workflow = (req) =>
                 state_fields.some((sf) => sf.name === "id")
             );
             show_view_opts[rfield.name] = show_views.map((v) => v.name);
+            slots_available_field[rfield.name] = retable.fields
+              .filter((f) => f.type?.name === "Integer")
+              .map((f) => f.name);
+            slots_available_field[rfield.name].forEach((v) =>
+              distinct_slot_fields.add(v)
+            );
+            slots_available_field[rfield.name].unshift("");
           }
           return new Form({
             fields: [
@@ -108,6 +117,29 @@ const configuration_workflow = (req) =>
                   calcOptions: ["reservable_entity_key", show_view_opts],
                 },
               },
+              {
+                name: "slots_available_field",
+                label: "Slots available field",
+                sublabel:
+                  "Field with a number of available instances of the reservable entity. If blank, treat as one per entity.",
+                type: "String",
+                attributes: {
+                  calcOptions: ["reservable_entity_key", slots_available_field],
+                },
+              },
+              {
+                name: "slot_count_field",
+                label: "Slots taken field",
+                sublabel:
+                  "Field with the number of entities reserved. If blank, treat as one per entity.",
+                type: "String",
+                showIf: { slots_available_field: [...distinct_slot_fields] },
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "Integer")
+                    .map((f) => f.name),
+                },
+              },
             ],
           });
         },
@@ -118,7 +150,13 @@ const configuration_workflow = (req) =>
 const run = async (
   table_id,
   viewname,
-  { reservable_entity_key, valid_field, show_view },
+  {
+    reservable_entity_key,
+    valid_field,
+    slot_count_field,
+    slots_available_field,
+    show_view,
+  },
   state,
   extraArgs
 ) => {
@@ -141,7 +179,18 @@ const run = async (
 
   if (valid_field) reswhere[valid_field] = true;
   const ress = await restable.getRows(reswhere);
-  const resEnts = new Set(ress.map((r) => r[reservable_entity_key]));
+  const use_slots = slot_count_field || slots_available_field;
+  const resEnts = use_slots
+    ? {}
+    : new Set(ress.map((r) => r[reservable_entity_key]));
+  if (use_slots)
+    ress.forEach((r) => {
+      if (!resEnts[r[reservable_entity_key]])
+        resEnts[r[reservable_entity_key]] = 0;
+      if (!valid_field || r[valid_field])
+        resEnts[r[reservable_entity_key]] +=
+          typeof r[slot_count_field] === "undefined" ? 1 : r[slot_count_field];
+    });
 
   const sview = await View.findOne({ name: show_view });
   if (!sview)
@@ -151,7 +200,20 @@ const run = async (
   const srespAll = await sview.runMany(state, extraArgs);
   const srespsAvailable = [];
   for (const sresp of srespAll) {
-    if (!resEnts.has(sresp.row[retable.pk_name])) srespsAvailable.push(sresp);
+    if (!use_slots && !resEnts.has(sresp.row[retable.pk_name]))
+      srespsAvailable.push(sresp);
+    else {
+      /*console.log({
+        taken: resEnts[sresp.row[retable.pk_name]] || 0,
+        available: sresp.row[slots_available_field],
+      });*/
+      if (
+        use_slots &&
+        (resEnts[sresp.row[retable.pk_name]] || 0) <
+          sresp.row[slots_available_field]
+      )
+        srespsAvailable.push(sresp);
+    }
   }
   const showRow = (r) => r.html;
   return div(srespsAvailable.map(showRow));
