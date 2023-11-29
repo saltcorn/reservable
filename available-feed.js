@@ -99,6 +99,39 @@ const configuration_workflow = (req) =>
                 },
               },
               {
+                name: "start_field",
+                label: "Start date field",
+                type: "String",
+                required: true,
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "Date")
+                    .map((f) => f.name),
+                },
+              },
+              {
+                name: "end_field",
+                label: "End date field",
+                type: "String",
+                required: true,
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "Date")
+                    .map((f) => f.name),
+                },
+              },
+              /*{
+                name: "duration_field",
+                label: "Duration field",
+                sublabel: "Integer field holding booked duration in minutes",
+                type: "String",
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "Integer")
+                    .map((f) => f.name),
+                },
+              }, */
+              {
                 name: "show_view",
                 label: req.__("Single item view"),
                 type: "String",
