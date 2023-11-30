@@ -3,16 +3,18 @@ const Table = require("@saltcorn/data/models/table");
 
 module.exports = {
   configFields: async ({ table }) => {
-    const views = View.find({
+    const views = await View.find({
       viewtemplate: "Available Resources Feed",
       table_id: table.id,
     });
+    console.log({ views });
     return [
       {
         name: "feedview",
         label: "View",
         sublabel: `A view on table ${table.name} with pattern: Available Resources Feed`,
         type: "String",
+        required: true,
         attributes: {
           options: views.map((f) => f.name),
         },
