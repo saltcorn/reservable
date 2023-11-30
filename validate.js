@@ -35,7 +35,8 @@ module.exports = {
     //get all relevant reservations
 
     const ress = await table.getRows({
-      [reservable_entity_key]: row[reservable_entity_key],
+      [reservable_entity_key]:
+        row[reservable_entity_key]?.id || row[reservable_entity_key],
       [start_field]: { lt: row[end_field], equal: true, day_only: true },
       [end_field]: { gt: row[start_field], equal: true, day_only: true },
       ...(valid_field ? { [valid_field]: true } : {}),
@@ -45,7 +46,8 @@ module.exports = {
     const refield = table.getField(reservable_entity_key);
     const retable = Table.findOne(refield.reftable_name);
     const entity = await retable.getRow({
-      [retable.pk_name]: row[reservable_entity_key],
+      [retable.pk_name]:
+        row[reservable_entity_key]?.id || row[reservable_entity_key],
     });
     //check that for every day, there is availablity
     const from = new Date(row[start_field]);
