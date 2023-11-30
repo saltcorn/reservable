@@ -7,7 +7,6 @@ module.exports = {
       viewtemplate: "Available Resources Feed",
       table_id: table.id,
     });
-    console.log({ views });
     return [
       {
         name: "feedview",
