@@ -53,11 +53,12 @@ module.exports = {
     // loop for every day
     for (let day = from; day <= to; day.setDate(day.getDate() + 1)) {
       // your day is here
-      console.log(day);
       const active = ress.filter(
         (r) => r[start_field] <= day && r[end_field] >= day
       );
-      const taken = active.map((r) => r[slot_count_field]);
+      const taken = active
+        .map((r) => r[slot_count_field])
+        .reduce((a, b) => a + b, 0);
       maxAvailable = Math.min(
         maxAvailable,
         entity[slots_available_field] - taken

@@ -189,6 +189,8 @@ const run = async (
     slot_count_field,
     slots_available_field,
     show_view,
+    start_field,
+    end_field,
   },
   state,
   extraArgs
@@ -211,20 +213,8 @@ const run = async (
   });
 
   if (valid_field) reswhere[valid_field] = true;
-  const ress = await restable.getRows(reswhere);
+  const reservations = await restable.getRows(reswhere);
   const use_slots = slot_count_field || slots_available_field;
-  const resEnts = use_slots
-    ? {}
-    : new Set(ress.map((r) => r[reservable_entity_key]));
-  if (use_slots)
-    ress.forEach((r) => {
-      if (!resEnts[r[reservable_entity_key]])
-        resEnts[r[reservable_entity_key]] = 0;
-      if (!valid_field || r[valid_field])
-        resEnts[r[reservable_entity_key]] +=
-          typeof r[slot_count_field] === "undefined" ? 1 : r[slot_count_field];
-    });
-
   const sview = await View.findOne({ name: show_view });
   if (!sview)
     throw new InvalidConfiguration(
@@ -232,21 +222,52 @@ const run = async (
     );
   const srespAll = await sview.runMany(state, extraArgs);
   const srespsAvailable = [];
-  for (const sresp of srespAll) {
-    if (!use_slots && !resEnts.has(sresp.row[retable.pk_name]))
-      srespsAvailable.push(sresp);
-    else {
-      /*console.log({
+
+  if (!use_slots) {
+    const resEnts = new Set(reservations.map((r) => r[reservable_entity_key]));
+    for (const sresp of srespAll) {
+      if (!resEnts.has(sresp.row[retable.pk_name])) srespsAvailable.push(sresp);
+    }
+  } else {
+    const resEnts = {};
+
+    /*reservations.forEach((r) => {
+      if (!resEnts[r[reservable_entity_key]])
+        resEnts[r[reservable_entity_key]] = 0;
+      if (!valid_field || r[valid_field])
+        resEnts[r[reservable_entity_key]] +=
+          typeof r[slot_count_field] === "undefined" ? 1 : r[slot_count_field];
+    });*/
+    const from = new Date(reswhere[start_field]?.lt);
+    const to = new Date(reswhere[end_field]?.gt);
+    //console.log("state_res", state_res);
+    //console.log("reswhere", reswhere);
+
+    if (!from || !to) srespsAvailable.push(...srespAll);
+    else
+      for (const sresp of srespAll) {
+        const myreservations = reservations.filter(
+          (r) => r[reservable_entity_key] === sresp.row[retable.pk_name]
+        );
+        /*console.log({
         taken: resEnts[sresp.row[retable.pk_name]] || 0,
         available: sresp.row[slots_available_field],
       });*/
-      if (
-        use_slots &&
-        (resEnts[sresp.row[retable.pk_name]] || 0) <
-          sresp.row[slots_available_field]
-      )
-        srespsAvailable.push(sresp);
-    }
+        let maxAvailable = sresp.row[slots_available_field];
+        for (let day = from; day <= to; day.setDate(day.getDate() + 1)) {
+          const active = myreservations.filter(
+            (r) => r[start_field] <= day && r[end_field] >= day
+          );
+          const taken = active
+            .map((r) => r[slot_count_field] || 1)
+            .reduce((a, b) => a + b, 0);
+          maxAvailable = Math.min(
+            maxAvailable,
+            sresp.row[slots_available_field] - taken
+          );
+        }
+        if (maxAvailable > 0) srespsAvailable.push(sresp);
+      }
   }
   const showRow = (r) => r.html;
   return div(srespsAvailable.map(showRow));
