@@ -180,6 +180,8 @@ const configuration_workflow = (req) =>
     ],
   });
 
+const first = (xs) => (Array.isArray(xs) ? xs[0] : xs);
+
 const run = async (
   table_id,
   viewname,
@@ -229,20 +231,10 @@ const run = async (
       if (!resEnts.has(sresp.row[retable.pk_name])) srespsAvailable.push(sresp);
     }
   } else {
-    const resEnts = {};
-
-    /*reservations.forEach((r) => {
-      if (!resEnts[r[reservable_entity_key]])
-        resEnts[r[reservable_entity_key]] = 0;
-      if (!valid_field || r[valid_field])
-        resEnts[r[reservable_entity_key]] +=
-          typeof r[slot_count_field] === "undefined" ? 1 : r[slot_count_field];
-    });*/
-    const from = new Date(reswhere[start_field]?.lt);
-    const to = new Date(reswhere[end_field]?.gt);
     //console.log("state_res", state_res);
     //console.log("reswhere", reswhere);
-
+    const to = new Date(first(reswhere[start_field])?.lt);
+    const from = new Date(first(reswhere[end_field])?.gt);
     if (!from || !to) srespsAvailable.push(...srespAll);
     else
       for (const sresp of srespAll) {
@@ -253,6 +245,8 @@ const run = async (
         taken: resEnts[sresp.row[retable.pk_name]] || 0,
         available: sresp.row[slots_available_field],
       });*/
+        const to = new Date(first(reswhere[start_field])?.lt);
+        const from = new Date(first(reswhere[end_field])?.gt);
         let maxAvailable = sresp.row[slots_available_field];
         for (let day = from; day <= to; day.setDate(day.getDate() + 1)) {
           const active = myreservations.filter(
@@ -265,6 +259,7 @@ const run = async (
             maxAvailable,
             sresp.row[slots_available_field] - taken
           );
+          //console.log({ car: sresp.row.name, day, maxAvailable });
         }
         if (maxAvailable > 0) srespsAvailable.push(sresp);
       }
