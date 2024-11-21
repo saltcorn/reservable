@@ -105,6 +105,12 @@ const configuration_workflow = () =>
                   options: show_view_opts,
                 },
               },
+              {
+                name: "btn_columns",
+                label: "Button columns",
+                type: "Integer",
+                default: 1,
+              },
               new FieldRepeat({
                 name: "availability",
                 fields: [
@@ -254,7 +260,7 @@ const get_available_slots = async ({
       available_slots[i] = false;
     }
   });
-  return { available_slots, from, durGCD };
+  return { available_slots, from, durGCD, taken_slots };
 };
 
 const run = async (
@@ -266,6 +272,7 @@ const run = async (
     duration_field,
     availability,
     services,
+    btn_columns,
   },
   state,
   { req, res }
@@ -280,37 +287,44 @@ const run = async (
   }
 
   const date = state.day ? new Date(state.day) : new Date(); //todo from state
-  const { available_slots, from, durGCD } = await get_available_slots({
-    table,
-    availability,
-    date,
-    entity_wanted,
-    reservable_entity_key,
-    services,
-    start_field,
-    duration_field,
-  });
+  const { available_slots, from, durGCD, taken_slots } =
+    await get_available_slots({
+      table,
+      availability,
+      date,
+      entity_wanted,
+      reservable_entity_key,
+      services,
+      start_field,
+      duration_field,
+    });
   const minSlot = Math.min(...Object.keys(available_slots));
   const maxSlot = Math.max(...Object.keys(available_slots));
   const service_availabilities = services.map((service, serviceIx) => {
     const nslots = service.duration / durGCD;
     const availabilities = [];
     for (let i = minSlot; i <= maxSlot; i++) {
-      if (range(nslots, i).every((j) => available_slots[j])) {
-        const mins_since_midnight = i * durGCD;
-        const hour = Math.floor(mins_since_midnight / 60);
+      const mins_since_midnight = i * durGCD;
+      const hour = Math.floor(mins_since_midnight / 60);
 
-        const minute = mins_since_midnight - hour * 60;
-        const date1 = new Date(date);
-        date1.setHours(hour);
-        date1.setMinutes(minute);
-        date1.setSeconds(0);
-        date1.setMilliseconds(0);
-        if (date1 > new Date())
+      const minute = mins_since_midnight - hour * 60;
+      const date1 = new Date(date);
+      date1.setHours(hour);
+      date1.setMinutes(minute);
+      date1.setSeconds(0);
+      date1.setMilliseconds(0);
+      if (date1 > new Date())
+        if (range(nslots, i).every((j) => available_slots[j])) {
           availabilities.push({
             date: date1,
+            available: true,
           });
-      }
+        } else {
+          availabilities.push({
+            date: date1,
+            available: false,
+          });
+        }
     }
     //console.log({ availabilities, service });
     return { availabilities, service, serviceIx };
@@ -368,25 +382,39 @@ const run = async (
       )
     ),
     service_availabilities.map(({ availabilities, service, serviceIx }) =>
-      div(
+      ul(
         h3(service.title || `${service.duration} minutes`),
-        ul(
-          availabilities.map(({ date }) =>
-            reserve_btn({
-              viewname,
-              service,
-              date,
-              serviceIx,
-              req,
-              entity_wanted,
-              reservable_entity_key,
-            })
+        groupArray(availabilities, btn_columns || 1).map((gavail) =>
+          div(
+            gavail.map(({ date, available }) =>
+              reserve_btn({
+                viewname,
+                service,
+                date,
+                serviceIx,
+                req,
+                entity_wanted,
+                reservable_entity_key,
+                available,
+              })
+            )
           )
         )
       )
     )
   );
 };
+
+//https://stackoverflow.com/a/74206554
+function groupArray(array, num) {
+  const group = [];
+
+  for (let i = 0; i < array.length; i += num) {
+    group.push(array.slice(i, i + num));
+  }
+
+  return group;
+}
 
 const reserve_btn = ({
   viewname,
@@ -396,26 +424,37 @@ const reserve_btn = ({
   req,
   reservable_entity_key,
   entity_wanted,
+  available,
 }) =>
-  form(
-    { action: `/view/${viewname}`, method: "post" },
-    input({ type: "hidden", name: "_csrf", value: req.csrfToken() }),
-    input({ type: "hidden", name: "date", value: date.toISOString() }),
-    input({ type: "hidden", name: "serviceIx", value: serviceIx }),
-    entity_wanted &&
-      input({
-        type: "hidden",
-        name: reservable_entity_key,
-        value: entity_wanted,
-      }),
-    input({ type: "hidden", name: "step", value: "getReservationForm" }),
+  available
+    ? form(
+        { action: `/view/${viewname}`, method: "post", class: "d-inline" },
+        input({ type: "hidden", name: "_csrf", value: req.csrfToken() }),
+        input({ type: "hidden", name: "date", value: date.toISOString() }),
+        input({ type: "hidden", name: "serviceIx", value: serviceIx }),
+        entity_wanted &&
+          input({
+            type: "hidden",
+            name: reservable_entity_key,
+            value: entity_wanted,
+          }),
+        input({ type: "hidden", name: "step", value: "getReservationForm" }),
 
-    button(
-      { type: "submit", class: "btn btn-primary mt-2" },
-      localeTime(date)
-      //  `${hour}:${String(minute).padStart(2, "0")}`
-    )
-  );
+        button(
+          { type: "submit", class: "btn btn-primary mt-2 me-2" },
+          localeTime(date)
+          //  `${hour}:${String(minute).padStart(2, "0")}`
+        )
+      )
+    : button(
+        {
+          type: "button",
+          disabled: true,
+          class: "btn btn-secondary mt-2 me-2",
+        },
+        localeTime(date)
+        //  `${hour}:${String(minute).padStart(2, "0")}`
+      );
 const getReservationForm = async ({ table, viewname, config, body, req }) => {
   const {
     view_to_create,
