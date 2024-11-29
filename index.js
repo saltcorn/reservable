@@ -396,6 +396,8 @@ const run = async (
                 entity_wanted,
                 reservable_entity_key,
                 available,
+                state,
+                table,
               })
             )
           )
@@ -425,6 +427,8 @@ const reserve_btn = ({
   reservable_entity_key,
   entity_wanted,
   available,
+  state,
+  table,
 }) =>
   available
     ? form(
@@ -438,6 +442,15 @@ const reserve_btn = ({
             name: reservable_entity_key,
             value: entity_wanted,
           }),
+        table.fields
+          .filter((f) => f.name !== reservable_entity_key && state[f.name])
+          .map((f) =>
+            input({
+              type: "hidden",
+              name: f.name,
+              value: state[f.name],
+            })
+          ),
         input({ type: "hidden", name: "step", value: "getReservationForm" }),
 
         button(
@@ -470,7 +483,11 @@ const getReservationForm = async ({ table, viewname, config, body, req }) => {
   const form = await getForm(table, viewname, columns, layout, null, req);
   form.hidden(start_field, duration_field, "step");
   if (reservable_entity_key) form.hidden(reservable_entity_key);
-
+  table.fields
+    .filter((f) => f.name !== reservable_entity_key && body[f.name])
+    .forEach((f) => {
+      form.hidden(f.name);
+    });
   return form;
 };
 const makeReservation = async ({ table, viewname, config, body, req, res }) => {
@@ -540,7 +557,11 @@ const runPost = async (
       [config.reservable_entity_key]: +body[config.reservable_entity_key],
       step: "makeReservation",
     };
-
+    table.fields
+      .filter((f) => f.name !== config.reservable_entity_key && body[f.name])
+      .forEach((f) => {
+        form.values[f.name] = body[f.name];
+      });
     res.sendWrap(viewname, renderForm(form, req.csrfToken()));
   } else if (body.step === "makeReservation") {
     return await makeReservation({
