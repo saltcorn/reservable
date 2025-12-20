@@ -191,7 +191,7 @@ const gcd = function (a, b) {
 
 let gcdArr = function (arr) {
   let gcdres = gcd(arr[0], arr[1]);
-  for (let i = 3; i < arr.length; i++) {
+  for (let i = 2; i < arr.length; i++) {
     gcdres = gcd(gcdres, arr[i]);
   }
   return gcdres;
