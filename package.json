@@ -5,7 +5,8 @@
   "main": "index.js",
   "dependencies": {
     "@saltcorn/markup": "^0.5.1",
-    "@saltcorn/data": "^0.5.1"
+    "@saltcorn/data": "^0.5.1",
+    "@saltcorn/plain-date": "0.2.5"
   },
   "author": "Tom Nielsen",
   "license": "MIT",
