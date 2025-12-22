@@ -153,148 +153,146 @@ const configuration_workflow = (req) =>
   });
 
 module.exports = {
-  "Reservation availabilites": {
-    configuration_workflow,
-    fields: (cfg) => {
-      if (!cfg?.table_name) return [];
+  configuration_workflow,
+  fields: (cfg) => {
+    if (!cfg?.table_name) return [];
 
-      const table = Table.findOne({ name: cfg.table_name });
-      let entity_key;
-      if (cfg.reservable_entity_key) {
-        entity_key = table.getField(cfg.reservable_entity_key);
-      }
-      return [
-        {
-          name: "reserve_ident",
-          type: "String",
-          primary_key: true,
-          is_unique: true,
-        },
-        {
-          name: "start_day",
-          label: "Start day",
-          type: "Date",
-          attributes: { day_only: true },
-        },
-        {
-          name: "start_date",
-          label: "Start date",
-          type: "Date",
-        },
-        {
-          name: "start_hour",
-          label: "Start hour",
-          type: "Integer",
-          attributes: { min: 0, max: 23 },
-        },
-        {
-          name: "start_minute",
-          label: "Start mintute",
-          type: "Integer",
-          attributes: { min: 0, max: 59 },
-        },
-        {
-          name: "service",
-          label: "Service",
-          type: "String",
-          attributes: { options: cfg.services.map((s) => s.title) },
-        },
-        {
-          name: "service_duration",
-          label: "Duration",
-          type: "Integer",
-        },
-        ...(entity_key
-          ? [
-              {
-                name: "entity",
-                label: "Entity",
-                type: `Key to ${entity_key.reftable_name}`,
-                attributes: {
-                  summary_field: entity_key.attributes.summary_field,
-                },
+    const table = Table.findOne({ name: cfg.table_name });
+    let entity_key;
+    if (cfg.reservable_entity_key) {
+      entity_key = table.getField(cfg.reservable_entity_key);
+    }
+    return [
+      {
+        name: "reserve_ident",
+        type: "String",
+        primary_key: true,
+        is_unique: true,
+      },
+      {
+        name: "start_day",
+        label: "Start day",
+        type: "Date",
+        attributes: { day_only: true },
+      },
+      {
+        name: "start_date",
+        label: "Start date",
+        type: "Date",
+      },
+      {
+        name: "start_hour",
+        label: "Start hour",
+        type: "Integer",
+        attributes: { min: 0, max: 23 },
+      },
+      {
+        name: "start_minute",
+        label: "Start mintute",
+        type: "Integer",
+        attributes: { min: 0, max: 59 },
+      },
+      {
+        name: "service",
+        label: "Service",
+        type: "String",
+        attributes: { options: cfg.services.map((s) => s.title) },
+      },
+      {
+        name: "service_duration",
+        label: "Duration",
+        type: "Integer",
+      },
+      ...(entity_key
+        ? [
+            {
+              name: "entity",
+              label: "Entity",
+              type: `Key to ${entity_key.reftable_name}`,
+              attributes: {
+                summary_field: entity_key.attributes.summary_field,
               },
-            ]
-          : []),
-      ];
-    },
-    get_table: (cfg) => {
-      return {
-        disableFiltering: true,
-        getRows: async (where, opts) => {
-          const table = Table.findOne({ name: cfg.table_name });
-          const date = !where?.start_day
-            ? new Date()
-            : where?.start_day.constructor.name === "PlainDate"
-            ? where.start_day.toDate()
-            : new Date(where?.start_day);
+            },
+          ]
+        : []),
+    ];
+  },
+  get_table: (cfg) => {
+    return {
+      disableFiltering: true,
+      getRows: async (where, opts) => {
+        const table = Table.findOne({ name: cfg.table_name });
+        const date = !where?.start_day
+          ? new Date()
+          : where?.start_day.constructor.name === "PlainDate"
+          ? where.start_day.toDate()
+          : new Date(where?.start_day);
 
-          const services = where?.service
-            ? cfg.services.filter((s) => s.title === where.service)
-            : cfg.services;
-          const { available_slots, from, durGCD, taken_slots } =
-            await get_available_slots({
-              table,
-              date,
-              availability: cfg.availability,
-              entity_wanted: where?.entity || undefined,
-              reservable_entity_key: cfg.reservable_entity_key,
-              start_field: cfg.start_field,
-              duration_field: cfg.duration_field,
-              services,
-            });
-          const minSlot = Math.min(...Object.keys(available_slots));
-          const maxSlot = Math.max(...Object.keys(available_slots));
-          const service_availabilities = services.map((service, serviceIx) => {
-            const nslots = service.duration / durGCD;
-            const availabilities = [];
-            for (let i = minSlot; i <= maxSlot; i++) {
-              const mins_since_midnight = i * durGCD;
-              const hour = Math.floor(mins_since_midnight / 60);
-
-              const minute = mins_since_midnight - hour * 60;
-              const date1 = new Date(date);
-              date1.setHours(hour);
-              date1.setMinutes(minute);
-              date1.setSeconds(0);
-              date1.setMilliseconds(0);
-              if (date1 > new Date())
-                if (range(nslots, i).every((j) => available_slots[j])) {
-                  availabilities.push({
-                    date: date1,
-                    available: true,
-                  });
-                } else {
-                  availabilities.push({
-                    date: date1,
-                    available: false,
-                  });
-                }
-            }
-            //console.log({ availabilities, service });
-            return { availabilities, service, serviceIx };
+        const services = where?.service
+          ? cfg.services.filter((s) => s.title === where.service)
+          : cfg.services;
+        const { available_slots, from, durGCD, taken_slots } =
+          await get_available_slots({
+            table,
+            date,
+            availability: cfg.availability,
+            entity_wanted: where?.entity || undefined,
+            reservable_entity_key: cfg.reservable_entity_key,
+            start_field: cfg.start_field,
+            duration_field: cfg.duration_field,
+            services,
           });
+        const minSlot = Math.min(...Object.keys(available_slots));
+        const maxSlot = Math.max(...Object.keys(available_slots));
+        const service_availabilities = services.map((service, serviceIx) => {
+          const nslots = service.duration / durGCD;
+          const availabilities = [];
+          for (let i = minSlot; i <= maxSlot; i++) {
+            const mins_since_midnight = i * durGCD;
+            const hour = Math.floor(mins_since_midnight / 60);
 
-          const rows = service_availabilities
-            .map(({ availabilities, service, serviceIx }) =>
-              availabilities
-                .filter((a) => a.available)
-                .map(({ date }) => {
-                  return {
-                    reserve_ident: `${date.toISOString()}//${service.title}`,
-                    service: service.title,
-                    service_duration: service.duration,
-                    start_day: new PlainDate(date),
-                    start_date: date,
-                    start_hour: date.getHours(),
-                    start_minute: date.getMinutes(),
-                  };
-                })
-            )
-            .flat();
-          return rows;
-        },
-      };
-    },
+            const minute = mins_since_midnight - hour * 60;
+            const date1 = new Date(date);
+            date1.setHours(hour);
+            date1.setMinutes(minute);
+            date1.setSeconds(0);
+            date1.setMilliseconds(0);
+            if (date1 > new Date())
+              if (range(nslots, i).every((j) => available_slots[j])) {
+                availabilities.push({
+                  date: date1,
+                  available: true,
+                });
+              } else {
+                availabilities.push({
+                  date: date1,
+                  available: false,
+                });
+              }
+          }
+          //console.log({ availabilities, service });
+          return { availabilities, service, serviceIx };
+        });
+
+        const rows = service_availabilities
+          .map(({ availabilities, service, serviceIx }) =>
+            availabilities
+              .filter((a) => a.available)
+              .map(({ date }) => {
+                return {
+                  reserve_ident: `${date.toISOString()}//${service.title}`,
+                  service: service.title,
+                  service_duration: service.duration,
+                  start_day: new PlainDate(date),
+                  start_date: date,
+                  start_hour: date.getHours(),
+                  start_minute: date.getMinutes(),
+                };
+              })
+          )
+          .flat();
+        return rows;
+      },
+    };
   },
 };
