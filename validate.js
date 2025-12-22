@@ -74,25 +74,6 @@ module.exports = {
     } = get_config();
     //get all relevant reservations
 
-    const q = valid_field ? { [valid_field]: true } : {};
-    if (end_field) {
-      q[start_field] = { lt: row[end_field], equal: true, day_only: true };
-      q[end_field] = { gt: row[start_field], equal: true, day_only: true };
-    } else {
-      q[start_field] = {
-        lt: row[start_field],
-        gt: row[start_field],
-        equal: true,
-        day_only: true,
-      };
-    }
-    if (reservable_entity_key)
-      q[reservable_entity_key] =
-        row[reservable_entity_key]?.id || row[reservable_entity_key];
-    //console.log("q", q);
-
-    const ress = await table.getRows(q);
-
     //get entity
     let entity;
     if (reservable_entity_key) {
@@ -104,6 +85,25 @@ module.exports = {
       });
     }
     if (end_field) {
+      const q = valid_field ? { [valid_field]: true } : {};
+      if (end_field) {
+        q[start_field] = { lt: row[end_field], equal: true, day_only: true };
+        q[end_field] = { gt: row[start_field], equal: true, day_only: true };
+      } else {
+        q[start_field] = {
+          lt: row[start_field],
+          gt: row[start_field],
+          equal: true,
+          day_only: true,
+        };
+      }
+      if (reservable_entity_key)
+        q[reservable_entity_key] =
+          row[reservable_entity_key]?.id || row[reservable_entity_key];
+      //console.log("q", q);
+
+      const ress = await table.getRows(q);
+
       //check that for every day, there is availablity
       const from = new Date(row[start_field]);
       const to = new Date(row[end_field]);
@@ -129,7 +129,25 @@ module.exports = {
         return maxAvailable === 1
           ? { error: `Not available` }
           : { error: `Only ${maxAvailable} are available` };
-    } else {
+    } else if (reserve_provided_table) {
+      const { get_table } = require("./table-provider");
+      const table = Table.findOne({ name: reserve_provided_table });
+      const ptable = get_table(table.provider_cfg);
+      const q = {};
+      if (entity) q.entity = entity.id; //todo pk_name
+      q.start_day = row[start_field];
+      const rows = await ptable.getRows(q);
+      const start_hr = new Date(row[start_field]).getHours()
+      const start_min = new Date(row[start_field]).getMinutes()
+      if (
+        !rows.find(
+          (r) =>
+            r.start_hour === start_hr &&
+            r.start_minute === start_min &&
+            r.service_duration >= row[duration_field]
+        )
+      )
+        return { error: `Not available` };
     }
   },
 };
