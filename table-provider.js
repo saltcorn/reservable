@@ -164,12 +164,12 @@ module.exports = {
         entity_key = table.getField(cfg.reservable_entity_key);
       }
       return [
-        /*   {
+        {
           name: "reserve_ident",
           type: "String",
           primary_key: true,
           is_unique: true,
-        },*/
+        },
         {
           name: "start_day",
           label: "Start day",
@@ -197,13 +197,12 @@ module.exports = {
           name: "service",
           label: "Service",
           type: "String",
-          //attributes: { options: cfg.services.map((s) => s.title) },
+          attributes: { options: cfg.services.map((s) => s.title) },
         },
         {
           name: "service_duration",
           label: "Duration",
           type: "Integer",
-          //attributes: { options: cfg.services.map((s) => s.title) },
         },
         ...(entity_key
           ? [
@@ -221,9 +220,15 @@ module.exports = {
     },
     get_table: (cfg) => {
       return {
+        disableFiltering: true,
         getRows: async (where, opts) => {
           const table = Table.findOne({ name: cfg.table_name });
-          const date = where?.start_day || new Date();
+          const date = !where?.start_day
+            ? new Date()
+            : where?.start_day.constructor.name === "PlainDate"
+            ? where.start_day.toDate()
+            : new Date(where?.start_day);
+
           const services = where?.service
             ? cfg.services.filter((s) => s.title === where.service)
             : cfg.services;
@@ -276,10 +281,11 @@ module.exports = {
                 .filter((a) => a.available)
                 .map(({ date }) => {
                   return {
+                    reserve_ident: `${date.toISOString()}//${service.title}`,
                     service: service.title,
                     service_duration: service.duration,
-                    start_day: date,
-                    start_date: new PlainDate(date),
+                    start_day: new PlainDate(date),
+                    start_date: date,
                     start_hour: date.getHours(),
                     start_minute: date.getMinutes(),
                   };

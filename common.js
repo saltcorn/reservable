@@ -36,7 +36,7 @@ const get_available_slots = async ({
   q[start_field] = [{ gt: from }, { lt: to }];
   if (reservable_entity_key && entity_wanted)
     q[reservable_entity_key] = entity_wanted;
-  //console.log({ date, q });
+  //console.log(JSON.stringify({ date, q }, null, 2));
   const taken_slots = await table.getRows(q);
 
   // figure out regular availability for this day
