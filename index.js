@@ -589,6 +589,7 @@ module.exports = {
     require("./available-feed"),
   ],
   actions: { validate_reservation: require("./validate") },
+  table_providers: require("./table-provider.js"),
 };
 
 /*
