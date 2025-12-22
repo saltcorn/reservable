@@ -7,31 +7,61 @@ module.exports = {
       viewtemplate: "Available Resources Feed",
       table_id: table.id,
     });
+    const tables = Table.find({ provider_name: "Reservation availabilites" });
+    const neither = views.length === 0 && tables.length === 0;
     return [
-      {
-        name: "feedview",
-        label: "View",
-        sublabel: `A view on table ${table.name} with pattern: Available Resources Feed`,
-        type: "String",
-        required: true,
-        attributes: {
-          options: views.map((f) => f.name),
-        },
-      },
+      ...(views.length || neither
+        ? [
+            {
+              name: "feedview",
+              label: "View",
+              sublabel: `A view on table ${table.name} with pattern: Available Resources Feed`,
+              type: "String",
+              attributes: {
+                options: views.map((f) => f.name),
+              },
+            },
+          ]
+        : []),
+      ...(tables.length || neither
+        ? [
+            {
+              name: "reserve_provided_table",
+              label: "Table",
+              sublabel: `A table with provider: Reservation availabilites`,
+              type: "String",
+              attributes: {
+                options: tables.map((f) => f.name),
+              },
+            },
+          ]
+        : []),
     ];
   },
   requireRow: true,
-  run: async ({ table, req, row, configuration: { feedview } }) => {
-    const view = View.findOne({ name: feedview });
+  run: async ({
+    table,
+    req,
+    row,
+    configuration: { feedview, reserve_provided_table },
+  }) => {
+    const get_config = () => {
+      if (feedview) {
+        const view = View.findOne({ name: feedview });
+        return view.configuration;
+      } else if (reserve_provided_table) {
+        const table = Table.findOne({ name: reserve_provided_table });
+        return table.provider_cfg;
+      }
+    };
     const {
       reservable_entity_key,
       valid_field,
       slot_count_field,
       slots_available_field,
-      show_view,
       start_field,
       end_field,
-    } = view.configuration;
+    } = get_config();
     //get all relevant reservations
 
     const ress = await table.getRows({
