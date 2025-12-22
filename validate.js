@@ -94,17 +94,21 @@ module.exports = {
     const ress = await table.getRows(q);
 
     //get entity
-    if (reservable_entity_key && end_field) {
+    let entity;
+    if (reservable_entity_key) {
       const refield = table.getField(reservable_entity_key);
       const retable = Table.findOne(refield.reftable_name);
-      const entity = await retable.getRow({
+      entity = await retable.getRow({
         [retable.pk_name]:
           row[reservable_entity_key]?.id || row[reservable_entity_key],
       });
+    }
+    if (end_field) {
       //check that for every day, there is availablity
       const from = new Date(row[start_field]);
       const to = new Date(row[end_field]);
-      let maxAvailable = entity[slots_available_field];
+      let maxAvailable =
+        slots_available_field && entity ? entity[slots_available_field] : 1;
       // loop for every day
       for (let day = from; day <= to; day.setDate(day.getDate() + 1)) {
         // your day is here
@@ -112,17 +116,20 @@ module.exports = {
           (r) => r[start_field] <= day && r[end_field] >= day
         );
         const taken = active
-          .map((r) => r[slot_count_field])
+          .map((r) => (slot_count_field ? r[slot_count_field] : 1))
           .reduce((a, b) => a + b, 0);
         maxAvailable = Math.min(
           maxAvailable,
-          entity[slots_available_field] - taken
+          (slots_available_field && entity
+            ? entity[slots_available_field]
+            : 1) - taken
         );
       }
-      if (maxAvailable < row[slot_count_field])
-        return { error: `Only ${maxAvailable} are available` };
+      if (maxAvailable < (slot_count_field ? row[slot_count_field] : 1))
+        return maxAvailable === 1
+          ? { error: `Not available` }
+          : { error: `Only ${maxAvailable} are available` };
     } else {
-
     }
   },
 };
