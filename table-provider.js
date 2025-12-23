@@ -164,7 +164,7 @@ module.exports = {
     }
     return [
       {
-        name: "reserve_ident",
+        name: "id",
         type: "String",
         primary_key: true,
         is_unique: true,
@@ -196,7 +196,7 @@ module.exports = {
         name: "service",
         label: "Service",
         type: "String",
-        attributes: { options: cfg.services.map((s) => s.title) },
+        attributes: { options: cfg.services.map((s) => s.title).join(",") },
       },
       {
         name: "service_duration",
