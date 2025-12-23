@@ -220,14 +220,19 @@ module.exports = {
   get_table: (cfg) => {
     return {
       disableFiltering: true,
-      getRows: async (where, opts) => {
+      getRows: async (where0, opts) => {
+        const where = { ...where0 };
         const table = Table.findOne({ name: cfg.table_name });
-        const date = !where?.start_day
+        let date = !where?.start_day
           ? new Date()
           : where?.start_day.constructor.name === "PlainDate"
           ? where.start_day.toDate()
           : new Date(where?.start_day);
-
+        if (typeof where?.id === "string") {
+          const service = where?.id.split("//")[1];
+          if (service) where.service = service;
+          date = new Date(where?.id.split("//")[0]);
+        }
         const services = where?.service
           ? cfg.services.filter((s) => s.title === where.service)
           : cfg.services;
@@ -280,7 +285,7 @@ module.exports = {
               .filter((a) => a.available)
               .map(({ date }) => {
                 return {
-                  reserve_ident: `${date.toISOString()}//${service.title}`,
+                  id: `${date.toISOString()}//${service.title}`,
                   service: service.title,
                   service_duration: service.duration,
                   start_day: new PlainDate(date),
@@ -291,7 +296,8 @@ module.exports = {
               })
           )
           .flat();
-        return rows;
+        if (where?.id) return rows.filter((r) => r.id === where.id);
+        else return rows;
       },
     };
   },
