@@ -292,6 +292,7 @@ module.exports = {
                   start_date: date,
                   start_hour: date.getHours(),
                   start_minute: date.getMinutes(),
+                  ...(where?.entity ? { entity: where.entity } : {}),
                 };
               })
           )
