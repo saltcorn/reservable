@@ -236,17 +236,26 @@ module.exports = {
         const services = where?.service
           ? cfg.services.filter((s) => s.title === where.service)
           : cfg.services;
-        const { available_slots, from, durGCD, taken_slots } =
-          await get_available_slots({
-            table,
-            date,
-            availability: cfg.availability,
-            entity_wanted: where?.entity || undefined,
-            reservable_entity_key: cfg.reservable_entity_key,
-            start_field: cfg.start_field,
-            duration_field: cfg.duration_field,
-            services,
-          });
+        const expand_entities = !where?.entity && cfg.reservable_entity_key;
+        const {
+          available_slots,
+          from,
+          durGCD,
+          taken_slots,
+          available_entity_slots,
+          entities,
+          entityTablePK,
+        } = await get_available_slots({
+          table,
+          date,
+          availability: cfg.availability,
+          entity_wanted: where?.entity || undefined,
+          reservable_entity_key: cfg.reservable_entity_key,
+          start_field: cfg.start_field,
+          duration_field: cfg.duration_field,
+          services,
+          expand_entities,
+        });
         const minSlot = Math.min(...Object.keys(available_slots));
         const maxSlot = Math.max(...Object.keys(available_slots));
         const service_availabilities = services.map((service, serviceIx) => {
@@ -263,17 +272,21 @@ module.exports = {
             date1.setSeconds(0);
             date1.setMilliseconds(0);
             if (date1 > new Date())
-              if (range(nslots, i).every((j) => available_slots[j])) {
+              if (expand_entities)
+                entities.forEach((e) => {
+                  availabilities.push({
+                    date: date1,
+                    available: range(nslots, i).every(
+                      (j) => available_entity_slots[e[entityTablePK]][j]
+                    ),
+                    entity: e[entityTablePK],
+                  });
+                });
+              else
                 availabilities.push({
                   date: date1,
-                  available: true,
+                  available: range(nslots, i).every((j) => available_slots[j]),
                 });
-              } else {
-                availabilities.push({
-                  date: date1,
-                  available: false,
-                });
-              }
           }
           //console.log({ availabilities, service });
           return { availabilities, service, serviceIx };
@@ -283,7 +296,7 @@ module.exports = {
           .map(({ availabilities, service, serviceIx }) =>
             availabilities
               .filter((a) => a.available)
-              .map(({ date }) => {
+              .map(({ date, entity }) => {
                 return {
                   id: `${date.toISOString()}//${service.title}`,
                   service: service.title,
@@ -292,7 +305,11 @@ module.exports = {
                   start_date: date,
                   start_hour: date.getHours(),
                   start_minute: date.getMinutes(),
-                  ...(where?.entity ? { entity: where.entity } : {}),
+                  ...(where?.entity
+                    ? { entity: where.entity }
+                    : entity
+                    ? { entity }
+                    : {}),
                 };
               })
           )

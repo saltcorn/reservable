@@ -1,3 +1,5 @@
+const Table = require("@saltcorn/data/models/table");
+
 const gcd = function (a, b) {
   if (!b) {
     return a;
@@ -27,6 +29,7 @@ const get_available_slots = async ({
   services,
   start_field,
   duration_field,
+  expand_entities,
 }) => {
   const from = new Date(date);
   from.setHours(0, 0, 0, 0);
@@ -38,6 +41,19 @@ const get_available_slots = async ({
     q[reservable_entity_key] = entity_wanted;
   //console.log(JSON.stringify({ date, q }, null, 2));
   const taken_slots = await table.getRows(q);
+  let ents = [];
+  let entTable;
+  let entityTablePK;
+  const available_entity_slots = {};
+  if (reservable_entity_key && !entity_wanted && expand_entities) {
+    const entKey = table.getField(reservable_entity_key);
+    entTable = Table.findOne(entKey.reftable_name);
+    ents = await entTable.getRows();
+    entityTablePK = entTable.pk_name;
+    ents.forEach((e) => {
+      available_entity_slots[e[entityTablePK]] = [];
+    });
+  }
 
   // figure out regular availability for this day
   const dayOfWeek = [
@@ -60,6 +76,9 @@ const get_available_slots = async ({
   relevant_availabilities.forEach(({ from, to }) => {
     for (let i = (from * 60) / durGCD; i < (to * 60) / durGCD; i++) {
       available_slots[i] = true;
+      ents.forEach((e) => {
+        available_entity_slots[e[entityTablePK]][i] = true;
+      });
     }
   });
   //console.log({ taken_slots });
@@ -75,9 +94,20 @@ const get_available_slots = async ({
     const to = from + slot[duration_field];
     for (let i = from / durGCD; i < to / durGCD; i++) {
       available_slots[i] = false;
+      ents.forEach((e) => {
+        available_entity_slots[e[entityTablePK]][i] = true;
+      });
     }
   });
-  return { available_slots, from, durGCD, taken_slots };
+  return {
+    available_slots,
+    available_entity_slots,
+    from,
+    durGCD,
+    taken_slots,
+    entities: ents,
+    entityTablePK
+  };
 };
 
 module.exports = { get_available_slots, range };
