@@ -1,6 +1,6 @@
 {
   "name": "@saltcorn/reservable",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Reservable resources",
   "main": "index.js",
   "dependencies": {
