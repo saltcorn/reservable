@@ -72,7 +72,7 @@ const get_available_slots = async ({
   );
 
   const available_slots = [];
-  const durGCD = gcdArr(services.map((s) => s.duration));
+  const durGCD = gcdArr([60, ...services.map((s) => s.duration)]);
   relevant_availabilities.forEach(({ from, to }) => {
     for (let i = (from * 60) / durGCD; i < (to * 60) / durGCD; i++) {
       available_slots[i] = true;
@@ -95,7 +95,7 @@ const get_available_slots = async ({
     for (let i = from / durGCD; i < to / durGCD; i++) {
       available_slots[i] = false;
       ents.forEach((e) => {
-        available_entity_slots[e[entityTablePK]][i] = true;
+        available_entity_slots[e[entityTablePK]][i] = false;
       });
     }
   });
@@ -106,7 +106,7 @@ const get_available_slots = async ({
     durGCD,
     taken_slots,
     entities: ents,
-    entityTablePK
+    entityTablePK,
   };
 };
 
